@@ -122,6 +122,13 @@ st.markdown("""
 | DAMA | Discharged Against Medical Advice | Alta médica solicitada por el paciente en contra de la recomendación |
 """)
 
-
+@st.cache_data
+def load_and_clean_data():
+    url = "https://raw.githubusercontent.com/anhuarduran/Proyecto-1/main/HDHI%20Admission%20data.csv"
+    try:
+        df_raw = pd.read_csv(url, sep=None, engine="python")
+    except Exception as e:
+        st.error(f"Error al cargar desde la URL: {e}. Asegúrate de tener el archivo `HDHI Admission data.csv` en la misma carpeta.")
+        return None
 
 
