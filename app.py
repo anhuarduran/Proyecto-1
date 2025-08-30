@@ -149,6 +149,26 @@ if 'bd' not in st.session_state:
 
 bd = st.session_state.bd
 
+st.subheader("2. Tratamiento de la base de datos")
+
+if 'bd' in st.session_state:
+    # Crea una copia para no modificar el DataFrame original 'bd'
+    df = st.session_state.bd.copy()
+
+    # Elimina las variables según tu código
+    df = df.drop(['SNO', 'MRD No.'], axis=1, errors='ignore')
+    df.drop('month year', axis=1, inplace=True, errors='ignore')
+
+    st.success("✅ ¡Variables 'SNO', 'MRD No.' y 'month year' eliminadas!")
+    
+    st.write("### Vista previa del nuevo DataFrame (df):")
+    st.dataframe(df.head())
+    
+    # Guarda el nuevo DataFrame limpio en el estado de sesión para el siguiente paso
+    st.session_state.df = df
+else:
+    st.error("Error: La base de datos 'bd' no está disponible en la sesión. Asegúrate de que la sección de carga se ha ejecutado.")
+
 # ============================================================
 # Paso 2: Mostrar información del DataFrame
 # ============================================================
