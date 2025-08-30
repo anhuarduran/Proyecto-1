@@ -194,4 +194,67 @@ else:
     st.error("Error: La base de datos 'bd' no está disponible en la sesión. Asegúrate de que la sección de carga se ha ejecutado.")
 
 
+st.markdown("---")
+st.header("2. Tratamiento y transformación de datos")
+
+@st.cache_data
+def process_and_clean_data(df):
+    """Realiza la transformación de tipos de datos y mapeo de variables."""
+
+    st.subheader("2.1 Transformar variables de fecha y numéricas")
+    # Convertir variables de fecha
+    if 'D.O.A' in df.columns:
+        df['D.O.A'] = pd.to_datetime(df['D.O.A'], format='%m/%d/%Y', errors='coerce')
+    if 'D.O.D' in df.columns:
+        df['D.O.D'] = pd.to_datetime(df['D.O.D'], format='%m/%d/%Y', errors='coerce')
+    
+    # Tratamiento de variables numéricas que están como categóricas
+    cols_to_clean = ['HB', 'TLC', 'PLATELETS', 'GLUCOSE', 'UREA', 'CREATININE', 'EF']
+    
+    for col in cols_to_clean:
+        if col in df.columns:
+            df[col] = (
+                df[col]
+                .astype(str)
+                .str.strip()
+                .replace(['EMPTY', 'nan', 'NaN', 'None', ''], np.nan)
+                .str.replace(r'[<>]', '', regex=True)
+                .str.replace(',', '.', regex=False)
+            )
+            # Convertir a numérico después de la limpieza
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    st.subheader("2.2 Mapeo de variables categóricas")
+    # Mapear variables categóricas a valores numéricos
+    if 'GENDER' in df.columns:
+        df['GENDER'] = df['GENDER'].map({'M': 1, 'F': 0})
+    if 'RURAL' in df.columns:
+        df['RURAL'] = df['RURAL'].map({'R': 1, 'U': 0})
+    if 'TYPE OF ADMISSION-EMERGENCY/OPD' in df.columns:
+        df['TYPE OF ADMISSION-EMERGENCY/OPD'] = df['TYPE OF ADMISSION-EMERGENCY/OPD'].map({'E': 1, 'O': 0})
+    if 'CHEST INFECTION' in df.columns:
+        df['CHEST INFECTION'] = df['CHEST INFECTION'].astype(str).map({'1': 1, '0': 0})
+    
+    # Crear variables dummy
+    if 'OUTCOME' in df.columns:
+        df = pd.get_dummies(df, columns=['OUTCOME'], drop_first=False)
+    
+    # Convertir booleanos a enteros
+    bool_cols = df.select_dtypes(include=bool).columns
+    if len(bool_cols) > 0:
+        df[bool_cols] = df[bool_cols].astype(int)
+
+    return df
+
+# Asegúrate de que el DataFrame 'df' de la sección anterior exista antes de procesarlo
+if 'df' in st.session_state:
+    df_cleaned = process_and_clean_data(st.session_state.df.copy())
+    st.session_state.df = df_cleaned
+    
+    st.success("✅ ¡Datos procesados correctamente!")
+    st.write("### Vista previa del DataFrame limpio:")
+    st.dataframe(df_cleaned.head())
+else:
+    st.error("Error: El DataFrame 'df' no está disponible en la sesión. Asegúrate de haber ejecutado los pasos anteriores.")
+
 
