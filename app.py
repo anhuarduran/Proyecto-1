@@ -180,4 +180,70 @@ if df_raw is not None:
 else:
     st.warning("⚠️ No se pudieron cargar los datos desde GitHub")
 
+# ========================
+# EXPLORACIÓN INICIAL (EDA)
+# ========================
+st.header("🔍 Exploración de Datos (EDA)")
+
+# Eliminar columna que no sirve
+if "duration of intensive unit stay" in df.columns:
+    df = df.drop("duration of intensive unit stay", axis=1)
+
+# Quitar espacios en los nombres de columnas
+df.columns = df.columns.str.strip()
+
+# ========================
+# Separación en categóricas y numéricas
+# ========================
+st.subheader("📑 Separación de variables")
+
+cat_features = [
+    'GENDER', 'RURAL', 'TYPE OF ADMISSION-EMERGENCY/OPD',
+    'OUTCOME_DAMA', 'OUTCOME_DISCHARGE', 'OUTCOME_EXPIRY',
+    'SMOKING', 'ALCOHOL', 'DM', 'HTN', 'CAD', 'PRIOR CMP', 'CKD',
+    'RAISED CARDIAC ENZYMES', 'SEVERE ANAEMIA', 'ANAEMIA', 'STABLE ANGINA',
+    'ACS', 'STEMI', 'ATYPICAL CHEST PAIN', 'HEART FAILURE', 'HFREF', 'HFNEF',
+    'VALVULAR', 'CHB', 'SSS', 'AKI', 'CVA INFRACT', 'CVA BLEED', 'AF', 'VT', 'PSVT',
+    'CONGENITAL', 'UTI', 'NEURO CARDIOGENIC SYNCOPE', 'ORTHOSTATIC',
+    'INFECTIVE ENDOCARDITIS', 'DVT', 'CARDIOGENIC SHOCK', 'SHOCK',
+    'PULMONARY EMBOLISM', 'CHEST INFECTION'
+]
+
+num_features = [col for col in df.columns if col not in cat_features and col not in ['D.O.A', 'D.O.D', 'DURATION OF STAY']]
+
+df_numericas = df[num_features]
+
+st.markdown(f"""
+- 🔢 Variables **numéricas detectadas**: `{len(num_features)}`  
+- 🧾 Variables **categóricas detectadas**: `{len(cat_features)}`
+""")
+
+# Mostrar ejemplos
+st.write("👀 Vista previa de variables numéricas:")
+st.dataframe(df_numericas.head(), use_container_width=True)
+
+# ========================
+# Boxplots de las variables numéricas
+# ========================
+st.subheader("📊 Distribución y posibles outliers (Boxplots)")
+
+st.info("A continuación se muestran diagramas de caja para cada variable numérica con el fin de identificar valores atípicos.")
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(4, 4, figsize=(20, 15))
+axes = axes.flatten()
+
+for i, col in enumerate(df_numericas):
+    sns.boxplot(x=df[col], ax=axes[i], color="skyblue")
+    axes[i].set_title(col, fontsize=10)
+    axes[i].tick_params(axis="x", rotation=45)
+
+# Eliminar ejes vacíos si sobran
+for j in range(i + 1, len(axes)):
+    fig.delaxes(axes[j])
+
+plt.tight_layout()
+st.pyplot(fig)
 
