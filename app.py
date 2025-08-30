@@ -124,6 +124,10 @@ st.markdown("""
 
 
 # Cargar datos una única vez y guardarlos en la memoria de la aplicación
+import streamlit as st
+import pandas as pd
+
+# Cargar datos una única vez
 @st.cache_data
 def load_data():
     url = "https://raw.githubusercontent.com/Juansebastianrde/Reduccion-de-dimensionalidad/main/HDHI%20Admission%20data.csv"
@@ -134,18 +138,12 @@ def load_data():
         st.error(f"Error al cargar desde la URL: {e}.")
         return None
 
+# Carga la base de datos y la guarda en la memoria de la aplicación
 if 'bd' not in st.session_state:
     st.session_state.bd = load_data()
 
 bd = st.session_state.bd
 
 if bd is not None:
-    st.dataframe(bd.head())
-
-st.header("Análisis de la base de datos")
-
-# Mostrar info del DataFrame
-info_buffer = []
-bd.info(buf=lambda s: info_buffer.append(s))
-info_output = "\n".join(info_buffer)
-st.code(info_output, language='text')
+    st.success("✅ ¡Base de datos cargada correctamente!")
+    st.write(bd.head())
