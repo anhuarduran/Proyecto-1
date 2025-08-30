@@ -63,6 +63,9 @@ else:
 # ========================
 # PREPROCESAMIENTO DE LA BASE
 # ========================
+# ========================
+# PREPROCESAMIENTO DE LA BASE
+# ========================
 @st.cache_data
 def preprocess_data(bd: pd.DataFrame) -> pd.DataFrame:
     """Limpieza y transformación del dataset hospitalario"""
@@ -115,7 +118,7 @@ def preprocess_data(bd: pd.DataFrame) -> pd.DataFrame:
     bool_cols = df.select_dtypes(include=bool).columns
     df[bool_cols] = df[bool_cols].astype(int)
 
-    # Eliminar variable "duration of intensive unit stay" (no disponible al ingreso)
+    # Eliminar variable "duration of intensive unit stay"
     if "duration of intensive unit stay" in df.columns:
         df = df.drop("duration of intensive unit stay", axis=1)
 
@@ -125,20 +128,56 @@ def preprocess_data(bd: pd.DataFrame) -> pd.DataFrame:
 # ========================
 # USO EN LA APP
 # ========================
+st.header("📊 Preprocesamiento de los datos")
+
 df_raw = load_data()
 if df_raw is not None:
-    st.success("✅ Datos cargados")
+    st.success("✅ Datos cargados correctamente desde GitHub")
     st.write("Dimensiones iniciales:", df_raw.shape)
+
+    st.markdown("""
+    ### 🔹 Paso 1: Eliminación de variables irrelevantes  
+    Se eliminan:  
+    - `BNP` (muchos nulos / ruido).  
+    - Identificadores internos: `SNO`, `MRD No.`.  
+    - Columna `month year`.  
+    """)
+
+    st.markdown("""
+    ### 🔹 Paso 2: Conversión de fechas  
+    Las variables `D.O.A` (fecha de admisión) y `D.O.D` (fecha de alta) se transforman al formato **datetime**.
+    """)
+
+    st.markdown("""
+    ### 🔹 Paso 3: Limpieza de variables numéricas  
+    Columnas como hemoglobina (HB), glucosa, creatinina, etc. contenían valores como `"EMPTY"`, `"<12"`, o con comas decimales.  
+    Estas se normalizan y convierten a numéricas reales.
+    """)
+
+    st.markdown("""
+    ### 🔹 Paso 4: Transformación de variables categóricas  
+    - `GENDER`: M=1, F=0  
+    - `RURAL`: R=1, U=0  
+    - `TYPE OF ADMISSION-EMERGENCY/OPD`: E=1, O=0  
+    - `CHEST INFECTION`: 1/0  
+    - `OUTCOME`: convertido a variables dummies  
+    """)
+
+    st.markdown("""
+    ### 🔹 Paso 5: Eliminación de información no disponible en el ingreso  
+    La variable **`duration of intensive unit stay`** se elimina porque no se conoce al momento del ingreso del paciente.
+    """)
 
     # Preprocesar
     df = preprocess_data(df_raw)
-    st.success("✅ Datos preprocesados")
+    st.success("✅ Datos preprocesados correctamente")
     st.write("Dimensiones después del preprocesamiento:", df.shape)
 
     # Vista previa
-    st.subheader("👀 Vista previa (después de limpieza)")
+    st.subheader("👀 Vista previa del dataset procesado")
     st.dataframe(df.head(), use_container_width=True)
 
 else:
-    st.warning("⚠️ No se pudieron cargar los datos")
+    st.warning("⚠️ No se pudieron cargar los datos desde GitHub")
+
 
