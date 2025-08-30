@@ -5,41 +5,30 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import math
-from IPython.display import display
+
+from scipy.stats import spearmanr, stats
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, QuantileTransformer, LabelEncoder
-from sklearn.feature_selection import RFE, SelectKBest, f_regression
-from sklearn.linear_model import LinearRegression, Lasso, Ridge, ElasticNet
-from sklearn.svm import SVR
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.metrics import mean_squared_error, r2_score
-from scipy.stats import spearmanr
-from sklearn.manifold import Isomap
+from sklearn.preprocessing import StandardScaler
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LinearRegression
 from sklearn.decomposition import PCA
-import statsmodels.api as sm
-import plotly.express as px
-import plotly.graph_objects as go
-import prince
-from sklearn.cluster import KMeans
+from sklearn.ensemble import RandomForestRegressor
 
-# Configuración de página
-st.set_page_config(page_title="Proyecto ML - Dimensionalidad", layout="wide")
-st.title("Proyecto ML - Reducción de Dimensionalidad")
-
-# Estado de dependencias
+# Dependencia opcional para MCA (Análisis de Correspondencias Múltiples)
 try:
     import prince
     HAS_PRINCE = True
 except ImportError:
     HAS_PRINCE = False
 
+st.set_page_config(page_title="Proyecto ML", layout="wide")
+st.title("Proyecto ML - Reducción de Dimensionalidad")
+
+# Verificación de dependencias
 col1, col2 = st.columns(2)
 with col1:
     st.success("✅ Librerías base y de ML disponibles")
@@ -54,110 +43,91 @@ with col2:
         )
 
 # ============================================================
-# 1. Cargar y Pre-procesar datos (función con cache)
+# 1. Descripción de la base de datos
 # ============================================================
+st.header("1. Descripción de la base de datos")
+
+st.markdown("""
+Este conjunto de datos corresponde a los registros de **14.845 admisiones hospitalarias** (**12.238** pacientes, incluyendo **1.921** con múltiples ingresos) recogidos durante un período de dos años (**1 de abril de 2017** a **31 de marzo de 2019**) en el **Hero DMC Heart Institute**, unidad del **Dayanand Medical College and Hospital** en **Ludhiana, Punjab, India**.
+
+La información incluye:
+
+* **Datos demográficos:** edad, género y procedencia (rural o urbana).
+* **Detalles de admisión:** tipo de admisión (emergencia u OPD), fechas de ingreso y alta, duración total de la estancia y **duración en unidad de cuidados intensivos** (columna objetivo en este proyecto).
+* **Antecedentes médicos:** tabaquismo, consumo de alcohol, diabetes mellitus (DM), hipertensión (HTN), enfermedad arterial coronaria (CAD), cardiomiopatía previa (CMP), y enfermedad renal crónica (CKD).
+* **Parámetros de laboratorio:** hemoglobina (HB), conteo total de leucocitos (TLC), plaquetas, glucosa, urea, creatinina, péptido natriurético cerebral (BNP), enzimas cardíacas elevadas (RCE) y fracción de eyección (EF).
+* **Condiciones clínicas y comorbilidades:** más de 28 variables como insuficiencia cardíaca, infarto con elevación del ST (STEMI), embolia pulmonar, shock, infecciones respiratorias, entre otras.
+* **Resultado hospitalario:** estado al alta (alta médica o fallecimiento).
+""")
+
+st.markdown("""
+| Nombre de la variable | Nombre completo | Explicacion breve |
+|:---:|:---:|:---:|
+| SNO | Serial Number | Número único de registro |
+| MRD No. | Admission Number | Número asignado al ingreso |
+| D.O.A | Date of Admission | Fecha en que el paciente fue admitido |
+| D.O.D | Date of Discharge | Fecha en que el paciente fue dado de alta |
+| AGE | AGE | Edad del paciente |
+| GENDER | GENDER | Sexo del paciente |
+| RURAL | RURAL(R) /Urban(U) | Zona de residencia (rural/urbana) |
+| TYPE OF ADMISSION-EMERGENCY/OPD | TYPE OF ADMISSION-EMERGENCY/OPD | Si el ingreso fue por urgencias o consulta externa |
+| month year | month year | Mes y año del ingreso |
+| DURATION OF STAY | DURATION OF STAY | Días totales de hospitalización |
+| duration of intensive unit stay | duration of intensive unit stay | Duración de la estancia en UCI |
+| OUTCOME | OUTCOME | Resultado del paciente (alta, fallecimiento, etc.) |
+| SMOKING | SMOKING | Historial de consumo de tabaco |
+| ALCOHOL | ALCOHOL | Historial de consumo de alcohol |
+| DM | Diabetes Mellitus | Diagnóstico de diabetes mellitus |
+| HTN | Hypertension | Diagnóstico de hipertensión arterial |
+| CAD | Coronary Artery Disease | Diagnóstico de enfermedad coronaria |
+| PRIOR CMP | CARDIOMYOPATHY | Historial de miocardiopatía |
+| CKD | CHRONIC KIDNEY DISEASE | Diagnóstico de enfermedad renal crónica |
+| HB | Haemoglobin | Nivel de hemoglobina en sangre |
+| TLC | TOTAL LEUKOCYTES COUNT | Conteo total de leucocitos |
+| PLATELETS | PLATELETS | Conteo de plaquetas |
+| GLUCOSE | GLUCOSE | Nivel de glucosa en sangre |
+| UREA | UREA | Nivel de urea en sangre |
+| CREATININE | CREATININE | Nivel de creatinina en sangre |
+| BNP | B-TYPE NATRIURETIC PEPTIDE | Péptido relacionado con función cardíaca |
+| RAISED CARDIAC ENZYMES | RAISED CARDIAC ENZYMES | Presencia de enzimas cardíacas elevadas |
+| EF | Ejection Fraction | Fracción de eyección cardíaca |
+| SEVERE ANAEMIA| SEVERE ANAEMIA | Presencia de anemia grave |
+| ANAEMIA | ANAEMIA | Presencia de anemia |
+| STABLE ANGINA | STABLE ANGINA | Dolor torácico estable por angina |
+| ACS | Acute coronary Syndrome | Síndrome coronario agudo |
+| STEMI | ST ELEVATION MYOCARDIAL INFARCTION | Infarto agudo de miocardio con elevación del ST |
+| ATYPICAL CHEST PAIN | ATYPICAL CHEST PAIN | Dolor torácico no típico |
+| HEART FAILURE | HEART FAILURE | Diagnóstico de insuficiencia cardíaca |
+| HFREF | HEART FAILURE WITH REDUCED EJECTION FRACTION | Insuficiencia cardíaca con fracción de eyección reducida |
+| HFNEF | HEART FAILURE WITH NORMAL EJECTION FRACTION | Insuficiencia cardíaca con fracción de eyección conservada |
+| VALVULAR | Valvular Heart Disease | Enfermedad de válvulas cardíacas |
+| CHB | Complete Heart Block | Bloqueo cardíaco completo |
+| SSS | Sick sinus syndrome | Síndrome de disfunción sinusal |
+| AKI | ACUTE KIDNEY INJURY | Lesión renal aguda |
+| CVA INFRACT | Cerebrovascular Accident INFRACT | Accidente cerebrovascular isquémico |
+| CVA BLEED | Cerebrovascular Accident BLEED | Accidente cerebrovascular hemorrágico |
+| AF | Atrial Fibrilation | Fibrilación auricular |
+| VT | Ventricular Tachycardia | Taquicardia ventricular |
+| PSVT | PAROXYSMAL SUPRA VENTRICULAR TACHYCARDIA | Taquicardia supraventricular paroxística |
+| CONGENITAL | Congenital Heart Disease | Enfermedad cardíaca congénita |
+| UTI | Urinary tract infection | Infección de vías urinarias |
+| NEURO CARDIOGENIC SYNCOPE | NEURO CARDIOGENIC SYNCOPE | Síncope de origen cardiogénico |
+| ORTHOSTATIC | ORTHOSTATIC | Hipotensión postural |
+| INFECTIVE ENDOCARDITIS | INFECTIVE ENDOCARDITIS | Inflamación de las válvulas cardíacas por infección |
+| DVT | Deep venous thrombosis | Trombosis venosa profunda |
+| CARDIOGENIC SHOCK | CARDIOGENIC SHOCK | Shock de origen cardíaco |
+| SHOCK | SHOCK | Shock por otras causas |
+| PULMONARY EMBOLISM | PULMONARY EMBOLISM | Bloqueo de arterias pulmonares por coágulo |
+| CHEST INFECTION | CHEST INFECTION | Infección pulmonar |
+| DAMA | Discharged Against Medical Advice | Alta médica solicitada por el paciente en contra de la recomendación |
+""")
+
+
 @st.cache_data
 def load_and_clean_data():
     url = "https://raw.githubusercontent.com/Juansebastianrde/Reduccion-de-dimensionalidad/main/HDHI%20Admission%20data.csv"
     try:
         df_raw = pd.read_csv(url, sep=None, engine="python")
     except Exception as e:
-        st.error(f"Error al cargar desde la URL: {e}.")
+        st.error(f"Error al cargar desde la URL: {e}. Asegúrate de tener el archivo `HDHI Admission data.csv` en la misma carpeta.")
         return None
-
-    # Normalizar nombres de columnas a minúsculas y snake_case para un manejo más fácil
-    df_raw.columns = (
-        df_raw.columns.str.strip().str.lower()
-        .str.replace(" ", "_", regex=False)
-        .str.replace("-_", "_", regex=False)
-        .str.replace("(", "", regex=False)
-        .str.replace(")", "", regex=False)
-        .str.replace(".", "", regex=False)
-        .str.replace("/", "_", regex=False)
-    )
-
-    df = df_raw.drop(columns=["sno", "mrd_no", "month_year", "bnp", "duration_of_intensive_unit_stay"], errors="ignore").copy()
-    
-    if "doa" in df.columns:
-        df["doa"] = pd.to_datetime(df["doa"], format="%m/%d/%Y", errors="coerce")
-    if "dod" in df.columns:
-        df["dod"] = pd.to_datetime(df["dod"], format="%m/%d/%Y", errors="coerce")
-    
-    cols_to_clean = ["hb", "tlc", "platelets", "glucose", "urea", "creatinine", "ef"]
-    for col in cols_to_clean:
-        if col in df.columns:
-            df[col] = (df[col].astype(str).str.strip()
-                       .replace(["EMPTY", "nan", "NaN", "None", ""], np.nan)
-                       .str.replace(r"[<>]", "", regex=True)
-                       .str.replace(",", ".", regex=False))
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    if "gender" in df.columns:
-        df["gender"] = df["gender"].astype(str).str.strip().str.upper().map({"M": 1, "F": 0})
-    if "rural" in df.columns:
-        df["rural"] = df["rural"].astype(str).str.strip().str.upper().map({"R": 1, "U": 0})
-    if "type_of_admission-emergency_opd" in df.columns:
-        df["type_of_admission-emergency_opd"] = (
-            df["type_of_admission-emergency_opd"].astype(str).str.strip()
-            .str.upper().map({"E": 1, "O": 0})
-        )
-    if "chest_infection" in df.columns:
-        df["chest_infection"] = pd.to_numeric(df["chest_infection"], errors="coerce").astype("Int64")
-    
-    if "outcome" in df.columns:
-        df = pd.get_dummies(df, columns=["outcome"], drop_first=False, dtype=int)
-    
-    bool_cols = df.select_dtypes(include=bool).columns
-    if len(bool_cols) > 0:
-        df[bool_cols] = df[bool_cols].astype(int)
-
-    # Identificación de variables categóricas y numéricas
-    cat_features_raw = [
-        'gender', 'rural', 'type_of_admission-emergency_opd',
-        'outcome_dama', 'outcome_discharge', 'outcome_expiry',
-        'smoking', 'alcohol', 'dm', 'htn', 'cad', 'prior_cmp', 'ckd',
-        'raised_cardiac_enzymes', 'severe_anaemia', 'anaemia', 'stable_angina',
-        'acs', 'stemi', 'atypical_chest_pain', 'heart_failure', 'hfref', 'hfnef',
-        'valvular', 'chb', 'sss', 'aki', 'cva_infract', 'cva_bleed', 'af', 'vt', 'psvt',
-        'congenital', 'uti', 'neuro_cardiogenic_syncope', 'orthostatic',
-        'infective_endocarditis', 'dvt', 'cardiogenic_shock', 'shock',
-        'pulmonary_embolism', 'chest_infection'
-    ]
-    
-    cat_features = [c for c in cat_features_raw if c in df.columns]
-    exclude = [c for c in ['doa', 'dod', 'duration_of_stay'] if c in df.columns]
-    num_features = [c for c in df.columns if c not in cat_features + exclude]
-
-    st.session_state["df"] = df
-    st.session_state["cat_features"] = cat_features
-    st.session_state["num_features"] = num_features
-
-    return df
-
-st.header("1. Carga y pre-procesamiento de datos")
-if "df" not in st.session_state:
-    with st.spinner("Cargando y procesando los datos..."):
-        df = load_and_clean_data()
-    if df is not None:
-        st.success(f"Datos cargados: {df.shape}")
-        st.dataframe(df.head(), use_container_width=True)
-else:
-    df = st.session_state["df"]
-    st.success("Datos ya cargados.")
-    st.dataframe(df.head(), use_container_width=True)
-
-# ============================================================
-# 2. Análisis Exploratorio de Datos (EDA)
-# ============================================================
-st.header("2. Análisis Exploratorio de Datos (EDA)")
-
-with st.expander("Resumen de columnas (nulos y dtypes)", expanded=False):
-    summary = pd.DataFrame({
-        "dtype": df.dtypes.astype(str),
-        "non_null": df.notna().sum(),
-        "nulls": df.isna().sum(),
-        "unique": df.nunique(dropna=True)
-    })
-    summary["%nulls"] = (summary["nulls"] / len(df) * 100).round(2)
-    summary = summary[["dtype", "non_null", "nulls", "%nulls", "unique"]]
-    st.dataframe(summary, use_container_width=True)
