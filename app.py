@@ -348,3 +348,77 @@ st.markdown("""
 - Resto distribuido entre 20–40.  
 - Genera una distribución no simétrica con concentración en el límite superior.  
 """)
+
+# ==========================
+# RELACIONES BIVARIADAS
+# ==========================
+st.header("📌 Relaciones Bivariadas")
+
+# -------------------------
+# 1. Pairplot: Numéricas + Género
+# -------------------------
+st.subheader("📊 Dispersión de variables numéricas por género")
+
+st.markdown("""
+El siguiente gráfico compara las variables numéricas contra la variable **GÉNERO**:
+
+- **AGE**: No se observan tendencias lineales claras con otras variables.  
+- **HB**: Ligera correlación negativa con urea y creatinina; hombres tienden a valores más altos.  
+- **TLC**: Muy disperso, sin relación marcada con otras variables.  
+- **Plaquetas (PLATELETS)**: No muestra correlaciones fuertes, dispersión amplia en ambos géneros.  
+- **Glucose vs Urea/Creatinine**: Casos con glucosa muy alta tienden a mostrar también urea/creatinina altos.  
+- **Urea y Creatinine**: Relación positiva clara.  
+- **EF (fracción de eyección)**: Concentración en valor 60, con ligera relación inversa con urea/creatinina.  
+""")
+
+import seaborn as sns
+pair_fig = sns.pairplot(df[num_features + ["GENDER"]], 
+                        hue="GENDER", diag_kind="hist", height=2.5)
+st.pyplot(pair_fig)
+
+
+# ==========================
+# HOSPITALIZACIONES POR SEXO
+# ==========================
+st.header("👩‍🦰👨 Hospitalizaciones por Género")
+
+gender_counts = df['GENDER'].value_counts().rename(index={1: 'Masculino', 0: 'Femenino'})
+
+fig, ax = plt.subplots(figsize=(8,6))
+sns.barplot(x=gender_counts.index, y=gender_counts.values, palette='viridis', ax=ax)
+ax.set_title("Distribución de Género", fontsize=16)
+ax.set_xlabel("Género", fontsize=12)
+ax.set_ylabel("Cantidad de Personas", fontsize=12)
+
+for i, value in enumerate(gender_counts.values):
+    ax.text(i, value, str(value), ha='center', va='bottom', fontsize=10)
+
+st.pyplot(fig)
+
+st.markdown("""
+**Conclusión:**  
+La mayor cantidad de pacientes corresponde al **género masculino**.
+""")
+
+
+# ==========================
+# HOSPITALIZACIONES POR EDAD
+# ==========================
+st.header("📅 Hospitalizaciones según Edad")
+
+fig, ax = plt.subplots(figsize=(10,6))
+sns.histplot(data=df, x="AGE", bins=20, kde=False, color="blue", ax=ax)
+ax.set_title("Distribución de Edades", fontsize=16)
+ax.set_xlabel("Edad", fontsize=12)
+ax.set_ylabel("Frecuencia", fontsize=12)
+st.pyplot(fig)
+
+st.markdown("""
+**Conclusión:**
+
+- **Pico de hospitalizaciones**: entre **55 y 63 años**, seguido por 63–68 años.  
+- **Asimetría negativa**: la mayor concentración de hospitalizaciones ocurre en personas mayores.  
+- **Menor frecuencia**: en edades de **0 a 20 años**, con hospitalizaciones más asociadas a accidentes o condiciones congénitas.  
+
+En general, el **envejecimiento** se relaciona fuertemente con la mayor probabilidad de hospitalización debido a comorbilidades y deterioro natural de la salud.
+""")
