@@ -511,3 +511,78 @@ X_train_processed = preprocessor.fit_transform(X_train)
 X_test_processed = preprocessor.transform(X_test)
 
 st.success("✅ Preprocesamiento aplicado correctamente: imputación y escalado realizados.")
+
+# ==========================
+# 4. Selección de características: PCA
+# ==========================
+st.header("🧩 Selección de Características - PCA")
+
+# 1. Extraer numéricas procesadas
+num_indices = [i for i, col in enumerate(X_train.columns) if col in num_features]
+
+X_train_numericas = pd.DataFrame(
+    X_train_processed[:, num_indices],
+    columns=num_features
+)
+X_test_numericas = pd.DataFrame(
+    X_test_processed[:, num_indices],
+    columns=num_features
+)
+
+# 2. PCA (90% var. explicada)
+from sklearn.decomposition import PCA
+pca = PCA(n_components=0.90, random_state=42)
+Xn_train_pca = pca.fit_transform(X_train_numericas)
+Xn_test_pca  = pca.transform(X_test_numericas)
+
+pca_names = [f"PCA{i+1}" for i in range(Xn_train_pca.shape[1])]
+Xn_train_pca = pd.DataFrame(Xn_train_pca, columns=pca_names, index=X_train.index)
+Xn_test_pca  = pd.DataFrame(Xn_test_pca,  columns=pca_names, index=X_test.index)
+
+st.success(f"PCA generó **{len(pca_names)} componentes**, con una varianza acumulada explicada de **{pca.explained_variance_ratio_.sum():.3f}**.")
+
+# 3. Gráfico de varianza explicada
+var_exp = pca.explained_variance_ratio_
+cum_var_exp = np.cumsum(var_exp)
+
+fig, ax = plt.subplots(figsize=(8,5))
+ax.bar(range(1, len(var_exp)+1), var_exp, alpha=0.6, label="Varianza explicada por componente")
+ax.step(range(1, len(cum_var_exp)+1), cum_var_exp, where="mid", color="red", label="Varianza acumulada")
+ax.axhline(y=0.9, color="green", linestyle="--", label="90%")
+
+ax.set_xlabel("Componentes principales")
+ax.set_ylabel("Proporción de varianza explicada")
+ax.set_title("PCA - Varianza explicada y acumulada")
+ax.set_xticks(range(1, len(var_exp)+1))
+ax.legend()
+ax.grid(True)
+st.pyplot(fig)
+
+st.markdown("""
+📊 **Interpretación del PCA:**  
+- Para las variables numéricas, se logran construir **3 componentes principales**.  
+- Estas explican cerca del **74% de la varianza total**.  
+- La **primera componente** concentra la mayor parte (~47%), mostrando que algunas variables dominan la variabilidad.  
+""")
+
+
+# 4. Gráfico de dispersión en las 2 primeras componentes
+pc1 = Xn_train_pca.iloc[:, 0]
+pc2 = Xn_train_pca.iloc[:, 1]
+
+fig2, ax2 = plt.subplots(figsize=(10,8))
+ax2.scatter(pc1, pc2, alpha=0.6, s=20)
+ax2.set_xlabel(f"Componente Principal 1 ({pca.explained_variance_ratio_[0]*100:.2f}%)")
+ax2.set_ylabel(f"Componente Principal 2 ({pca.explained_variance_ratio_[1]*100:.2f}%)")
+ax2.set_title("Distribución de los datos en el espacio PCA (2 primeras componentes)")
+ax2.grid(True)
+st.pyplot(fig2)
+
+st.markdown("""
+🔎 **Análisis del gráfico PCA (2D):**  
+- La **primera componente** explica un **43.31%** de la varianza.  
+- La **segunda componente** explica un **16.28%**.  
+- Los puntos cerca del **(0,0)** representan observaciones "típicas".  
+- Los puntos alejados del origen pueden ser **valores atípicos**.  
+- La dispersión es mayor en la **componente 1**, lo que indica que esta concentra mayor variabilidad de la información.  
+""")
