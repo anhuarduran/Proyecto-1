@@ -131,4 +131,11 @@ def load_and_clean_data():
         st.error(f"Error al cargar desde la URL: {e}. Asegúrate de tener el archivo `HDHI Admission data.csv` en la misma carpeta.")
         return None
 
+Entendido. Para convertir esa línea de código a una aplicación de Streamlit, la función se mantendría igual, ya que pandas es una librería estándar y funcionará en Streamlit. Sin embargo, para que funcione, el archivo HDHI Admission data.csv debe estar en la misma carpeta que el archivo de tu aplicación de Streamlit.
 
+Aquí está la línea de código convertida para Streamlit:
+
+Python
+
+bd = pd.read_csv('HDHI Admission data.csv')
+st.write(bd.head())
