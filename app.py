@@ -247,3 +247,104 @@ for j in range(i + 1, len(axes)):
 plt.tight_layout()
 st.pyplot(fig)
 
+# ========================
+# OUTLIERS Y ASIMETRÍA
+# ========================
+st.header("📌 Análisis de Outliers y Distribuciones")
+
+# ------------------------
+# 1. Calcular outliers con IQR
+# ------------------------
+outliers_list = []
+for c in num_features:
+    Q1 = df[c].quantile(0.25)
+    Q3 = df[c].quantile(0.75)
+    IQR = Q3 - Q1
+    lower = Q1 - 1.5 * IQR
+    upper = Q3 + 1.5 * IQR
+
+    mask = (df[c] < lower) | (df[c] > upper)
+
+    temp = (
+        df.loc[mask, [c]]
+        .rename(columns={c: "value"})
+        .assign(
+            variable=c,
+            lower_bound=lower,
+            upper_bound=upper,
+            row_index=lambda x: x.index,
+        )
+    )
+
+    outliers_list.append(temp)
+
+outliers = pd.concat(outliers_list, ignore_index=True)
+resumen = outliers.groupby("variable").size().reset_index(name="n_outliers")
+resumen["pct_outliers"] = (resumen["n_outliers"] / len(df)) * 100
+
+st.subheader("📊 Porcentaje de outliers por variable")
+st.dataframe(resumen, use_container_width=True)
+
+# ------------------------
+# 2. Skewness (asimetría)
+# ------------------------
+from scipy.stats import skew
+
+asimetria_pandas = df_numericas.skew().sort_values(ascending=False)
+altamente_asimetricas = asimetria_pandas[abs(asimetria_pandas) > 2]
+
+st.subheader("📈 Asimetría (Skewness) de variables numéricas")
+st.write("Valores positivos indican cola larga a la derecha; negativos, cola a la izquierda.")
+st.dataframe(asimetria_pandas, use_container_width=True)
+
+st.warning("Variables con |asimetría| > 2 (fuertemente sesgadas):")
+st.write(altamente_asimetricas)
+
+# ------------------------
+# 3. Histogramas
+# ------------------------
+st.subheader("📉 Histogramas de variables numéricas")
+fig, ax = plt.subplots(figsize=(12, 8))
+df[num_features].hist(bins=50, figsize=(12, 8))
+st.pyplot(fig)
+
+# ------------------------
+# 4. Interpretación textual
+# ------------------------
+st.markdown("""
+### 📝 Interpretación de distribuciones
+
+**AGE (edad)**  
+- Distribución aproximadamente normal con ligera asimetría a la derecha.  
+- Mayor concentración entre 50 y 70 años.  
+
+**HB (hemoglobina)**  
+- Distribución bastante simétrica.  
+- Valores habituales entre 12 y 14 g/dL.  
+- Valores extremos (<8 o >18) son poco frecuentes.  
+
+**TLC (total leucocyte count)**  
+- Alta asimetría positiva.  
+- Mayoría de valores en rangos bajos, pero algunos muy altos generan cola larga.  
+
+**PLATELETS (plaquetas)**  
+- Distribución sesgada a la derecha.  
+- Mayor densidad entre 200k y 300k, con casos aislados más altos.  
+
+**GLUCOSE (glucosa)**  
+- Sesgo positivo pronunciado.  
+- Pico en valores bajos, pero con casos >400.  
+
+**UREA**  
+- Fuerte asimetría positiva.  
+- Mayoría <100, pero con casos extremos elevados.  
+
+**CREATININE (creatinina)**  
+- Sesgo positivo fuerte.  
+- Valores bajos dominan, pero hay casos altos dispersos.  
+
+**EF (ejection fraction)**  
+- Pico importante en 60.  
+- Resto distribuido entre 20–40.  
+- Genera una distribución no simétrica con concentración en el límite superior.  
+""")
