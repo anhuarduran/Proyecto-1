@@ -1,13 +1,11 @@
-# ============================================================
-# Paso 1 — Librerías y configuración Streamlit
-# ============================================================
+# app.py
+# -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import math
 
-from scipy.stats import spearmanr, stats
+from scipy.stats import spearmanr
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
@@ -18,118 +16,20 @@ from sklearn.linear_model import LinearRegression
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
 
-# Dependencia opcional para MCA (Análisis de Correspondencias Múltiples)
-try:
-    import prince
-    HAS_PRINCE = True
-except ImportError:
-    HAS_PRINCE = False
+import prince  # MCA, CA, FAMD
 
-st.set_page_config(page_title="Proyecto ML", layout="wide")
-st.title("Proyecto ML - Reducción de Dimensionalidad")
 
-# Verificación de dependencias
-col1, col2 = st.columns(2)
-with col1:
-    st.success("✅ Librerías base y de ML disponibles")
-with col2:
-    if HAS_PRINCE:
-        st.success("✅ `prince` instalado (MCA habilitado)")
-    else:
-        st.warning(
-            "ℹ️ `prince` no está instalado. "
-            "Para habilitar MCA, agrega `prince` a tu `requirements.txt` "
-            "o instala localmente con `pip install prince`."
-        )
+# ========================
+# CONFIGURACIÓN APP
+# ========================
+st.set_page_config(page_title="🏥 Hospital Admissions", layout="wide")
+st.title("🏥 Hospital Admissions Analysis")
+st.markdown("Aplicación convertida desde Google Colab → Streamlit ✔️")
 
-# ============================================================
-# 1. Descripción de la base de datos
-# ============================================================
-st.header("1. Descripción de la base de datos")
 
-st.markdown("""
-Este conjunto de datos corresponde a los registros de **14.845 admisiones hospitalarias** (**12.238** pacientes, incluyendo **1.921** con múltiples ingresos) recogidos durante un período de dos años (**1 de abril de 2017** a **31 de marzo de 2019**) en el **Hero DMC Heart Institute**, unidad del **Dayanand Medical College and Hospital** en **Ludhiana, Punjab, India**.
-
-La información incluye:
-
-* **Datos demográficos:** edad, género y procedencia (rural o urbana).
-* **Detalles de admisión:** tipo de admisión (emergencia u OPD), fechas de ingreso y alta, duración total de la estancia y **duración en unidad de cuidados intensivos** (columna objetivo en este proyecto).
-* **Antecedentes médicos:** tabaquismo, consumo de alcohol, diabetes mellitus (DM), hipertensión (HTN), enfermedad arterial coronaria (CAD), cardiomiopatía previa (CMP), y enfermedad renal crónica (CKD).
-* **Parámetros de laboratorio:** hemoglobina (HB), conteo total de leucocitos (TLC), plaquetas, glucosa, urea, creatinina, péptido natriurético cerebral (BNP), enzimas cardíacas elevadas (RCE) y fracción de eyección (EF).
-* **Condiciones clínicas y comorbilidades:** más de 28 variables como insuficiencia cardíaca, infarto con elevación del ST (STEMI), embolia pulmonar, shock, infecciones respiratorias, entre otras.
-* **Resultado hospitalario:** estado al alta (alta médica o fallecimiento).
-""")
-
-st.markdown("""
-| Nombre de la variable | Nombre completo | Explicacion breve |
-|:---:|:---:|:---:|
-| SNO | Serial Number | Número único de registro |
-| MRD No. | Admission Number | Número asignado al ingreso |
-| D.O.A | Date of Admission | Fecha en que el paciente fue admitido |
-| D.O.D | Date of Discharge | Fecha en que el paciente fue dado de alta |
-| AGE | AGE | Edad del paciente |
-| GENDER | GENDER | Sexo del paciente |
-| RURAL | RURAL(R) /Urban(U) | Zona de residencia (rural/urbana) |
-| TYPE OF ADMISSION-EMERGENCY/OPD | TYPE OF ADMISSION-EMERGENCY/OPD | Si el ingreso fue por urgencias o consulta externa |
-| month year | month year | Mes y año del ingreso |
-| DURATION OF STAY | DURATION OF STAY | Días totales de hospitalización |
-| duration of intensive unit stay | duration of intensive unit stay | Duración de la estancia en UCI |
-| OUTCOME | OUTCOME | Resultado del paciente (alta, fallecimiento, etc.) |
-| SMOKING | SMOKING | Historial de consumo de tabaco |
-| ALCOHOL | ALCOHOL | Historial de consumo de alcohol |
-| DM | Diabetes Mellitus | Diagnóstico de diabetes mellitus |
-| HTN | Hypertension | Diagnóstico de hipertensión arterial |
-| CAD | Coronary Artery Disease | Diagnóstico de enfermedad coronaria |
-| PRIOR CMP | CARDIOMYOPATHY | Historial de miocardiopatía |
-| CKD | CHRONIC KIDNEY DISEASE | Diagnóstico de enfermedad renal crónica |
-| HB | Haemoglobin | Nivel de hemoglobina en sangre |
-| TLC | TOTAL LEUKOCYTES COUNT | Conteo total de leucocitos |
-| PLATELETS | PLATELETS | Conteo de plaquetas |
-| GLUCOSE | GLUCOSE | Nivel de glucosa en sangre |
-| UREA | UREA | Nivel de urea en sangre |
-| CREATININE | CREATININE | Nivel de creatinina en sangre |
-| BNP | B-TYPE NATRIURETIC PEPTIDE | Péptido relacionado con función cardíaca |
-| RAISED CARDIAC ENZYMES | RAISED CARDIAC ENZYMES | Presencia de enzimas cardíacas elevadas |
-| EF | Ejection Fraction | Fracción de eyección cardíaca |
-| SEVERE ANAEMIA| SEVERE ANAEMIA | Presencia de anemia grave |
-| ANAEMIA | ANAEMIA | Presencia de anemia |
-| STABLE ANGINA | STABLE ANGINA | Dolor torácico estable por angina |
-| ACS | Acute coronary Syndrome | Síndrome coronario agudo |
-| STEMI | ST ELEVATION MYOCARDIAL INFARCTION | Infarto agudo de miocardio con elevación del ST |
-| ATYPICAL CHEST PAIN | ATYPICAL CHEST PAIN | Dolor torácico no típico |
-| HEART FAILURE | HEART FAILURE | Diagnóstico de insuficiencia cardíaca |
-| HFREF | HEART FAILURE WITH REDUCED EJECTION FRACTION | Insuficiencia cardíaca con fracción de eyección reducida |
-| HFNEF | HEART FAILURE WITH NORMAL EJECTION FRACTION | Insuficiencia cardíaca con fracción de eyección conservada |
-| VALVULAR | Valvular Heart Disease | Enfermedad de válvulas cardíacas |
-| CHB | Complete Heart Block | Bloqueo cardíaco completo |
-| SSS | Sick sinus syndrome | Síndrome de disfunción sinusal |
-| AKI | ACUTE KIDNEY INJURY | Lesión renal aguda |
-| CVA INFRACT | Cerebrovascular Accident INFRACT | Accidente cerebrovascular isquémico |
-| CVA BLEED | Cerebrovascular Accident BLEED | Accidente cerebrovascular hemorrágico |
-| AF | Atrial Fibrilation | Fibrilación auricular |
-| VT | Ventricular Tachycardia | Taquicardia ventricular |
-| PSVT | PAROXYSMAL SUPRA VENTRICULAR TACHYCARDIA | Taquicardia supraventricular paroxística |
-| CONGENITAL | Congenital Heart Disease | Enfermedad cardíaca congénita |
-| UTI | Urinary tract infection | Infección de vías urinarias |
-| NEURO CARDIOGENIC SYNCOPE | NEURO CARDIOGENIC SYNCOPE | Síncope de origen cardiogénico |
-| ORTHOSTATIC | ORTHOSTATIC | Hipotensión postural |
-| INFECTIVE ENDOCARDITIS | INFECTIVE ENDOCARDITIS | Inflamación de las válvulas cardíacas por infección |
-| DVT | Deep venous thrombosis | Trombosis venosa profunda |
-| CARDIOGENIC SHOCK | CARDIOGENIC SHOCK | Shock de origen cardíaco |
-| SHOCK | SHOCK | Shock por otras causas |
-| PULMONARY EMBOLISM | PULMONARY EMBOLISM | Bloqueo de arterias pulmonares por coágulo |
-| CHEST INFECTION | CHEST INFECTION | Infección pulmonar |
-| DAMA | Discharged Against Medical Advice | Alta médica solicitada por el paciente en contra de la recomendación |
-""")
-
-import streamlit as st
-import pandas as pd
-import numpy as np
-from io import StringIO
-
-# ============================================================
-# Paso 1: Carga y almacenamiento de datos
-# ============================================================
+# ========================
+# CARGA DE DATOS
+# ========================
 @st.cache_data
 def load_data():
     """
@@ -144,227 +44,19 @@ def load_data():
         st.error(f"Error al cargar la base de datos: {e}")
         return None
 
-if 'bd' not in st.session_state:
-    st.session_state.bd = load_data()
 
-bd = st.session_state.bd
+df = load_data()
 
-st.subheader("2. Tratamiento de la base de datos")
+if df is not None:
+    st.success("✅ Datos cargados correctamente desde GitHub")
 
-if 'bd' in st.session_state:
-    # Crea una copia para no modificar el DataFrame original 'bd'
-    df = st.session_state.bd.copy()
+    st.subheader("👀 Vista previa")
+    st.write("Dimensiones del dataset:", df.shape)
+    st.dataframe(df.head(), use_container_width=True)
 
-    # Elimina las variables según tu código
-    df = df.drop(['SNO', 'MRD No.'], axis=1, errors='ignore')
-    df.drop('month year', axis=1, inplace=True, errors='ignore')
-
-    st.success("✅ ¡Variables 'SNO', 'MRD No.' y 'month year' eliminadas!")
-    
-    st.write("### Vista previa del nuevo DataFrame (df):")
-    st.dataframe(df.head())
-    
-    # Guarda el nuevo DataFrame limpio en el estado de sesión para el siguiente paso
-    st.session_state.df = df
-else:
-    st.error("Error: La base de datos 'bd' no está disponible en la sesión. Asegúrate de que la sección de carga se ha ejecutado.")
-
-# ============================================================
-# Paso 2: Mostrar información del DataFrame
-# ============================================================
-st.header("Información de la base de datos")
-
-if bd is not None:
-    st.success("✅ ¡Base de datos cargada correctamente!")
-    
-    # Mostrar primeras filas
-    st.write("### Vista previa de los datos:")
-    st.dataframe(bd.head())
-    
-    # Captura y muestra el resultado de bd.info()
-    buffer = StringIO()
-    bd.info(buf=buffer)
-    info_output = buffer.getvalue()
-    
-    st.code(info_output, language='text')
-else:
-    st.warning("La base de datos no se pudo cargar. Revisa la URL y tu conexión.")
-
-st.markdown("---")
-st.header("2. Tratamiento de la base de datos")
-
-if 'bd' in st.session_state:
-    st.subheader("Eliminar variables innecesarias")
-    
-    # Crea una copia para no modificar el DataFrame original 'bd'
-    df = st.session_state.bd.copy()
-
-    # Elimina las variables según tu código
-    df = df.drop(['SNO', 'MRD No.', 'month year', 'BNP'], axis=1, errors='ignore')
-    
-    st.success("✅ Variables innecesarias eliminadas.")
-    st.info("Se eliminaron las columnas: 'SNO', 'MRD No.', 'month year' y 'BNP'.")
-    
-    st.write("### Vista previa del nuevo DataFrame (df):")
-    st.dataframe(df.head())
-    
-    # Guarda el nuevo DataFrame limpio en el estado de sesión para el siguiente paso
-    st.session_state.df = df
-else:
-    st.error("Error: La base de datos 'bd' no está disponible en la sesión. Asegúrate de que la sección de carga se ha ejecutado.")
-
-
-st.markdown("---")
-st.header("2. Tratamiento y transformación de datos")
-
-@st.cache_data
-def process_and_clean_data(df):
-    """Realiza la transformación de tipos de datos y mapeo de variables."""
-
-    st.subheader("2.1 Transformar variables de fecha y numéricas")
-    # Convertir variables de fecha
-    if 'D.O.A' in df.columns:
-        df['D.O.A'] = pd.to_datetime(df['D.O.A'], format='%m/%d/%Y', errors='coerce')
-    if 'D.O.D' in df.columns:
-        df['D.O.D'] = pd.to_datetime(df['D.O.D'], format='%m/%d/%Y', errors='coerce')
-    
-    # Tratamiento de variables numéricas que están como categóricas
-    cols_to_clean = ['HB', 'TLC', 'PLATELETS', 'GLUCOSE', 'UREA', 'CREATININE', 'EF']
-    
-    for col in cols_to_clean:
-        if col in df.columns:
-            df[col] = (
-                df[col]
-                .astype(str)
-                .str.strip()
-                .replace(['EMPTY', 'nan', 'NaN', 'None', ''], np.nan)
-                .str.replace(r'[<>]', '', regex=True)
-                .str.replace(',', '.', regex=False)
-            )
-            # Convertir a numérico después de la limpieza
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-    
-    st.subheader("2.2 Mapeo de variables categóricas")
-    # Mapear variables categóricas a valores numéricos
-    if 'GENDER' in df.columns:
-        df['GENDER'] = df['GENDER'].map({'M': 1, 'F': 0})
-    if 'RURAL' in df.columns:
-        df['RURAL'] = df['RURAL'].map({'R': 1, 'U': 0})
-    if 'TYPE OF ADMISSION-EMERGENCY/OPD' in df.columns:
-        df['TYPE OF ADMISSION-EMERGENCY/OPD'] = df['TYPE OF ADMISSION-EMERGENCY/OPD'].map({'E': 1, 'O': 0})
-    if 'CHEST INFECTION' in df.columns:
-        df['CHEST INFECTION'] = df['CHEST INFECTION'].astype(str).map({'1': 1, '0': 0})
-    
-    # Crear variables dummy
-    if 'OUTCOME' in df.columns:
-        df = pd.get_dummies(df, columns=['OUTCOME'], drop_first=False)
-    
-    # Convertir booleanos a enteros
-    bool_cols = df.select_dtypes(include=bool).columns
-    if len(bool_cols) > 0:
-        df[bool_cols] = df[bool_cols].astype(int)
-
-    return df
-
-# Asegúrate de que el DataFrame 'df' de la sección anterior exista antes de procesarlo
-if 'df' in st.session_state:
-    df_cleaned = process_and_clean_data(st.session_state.df.copy())
-    st.session_state.df = df_cleaned
-    
-    st.success("✅ ¡Datos procesados correctamente!")
-    st.write("### Vista previa del DataFrame limpio:")
-    st.dataframe(df_cleaned.head())
-else:
-    st.error("Error: El DataFrame 'df' no está disponible en la sesión. Asegúrate de haber ejecutado los pasos anteriores.")
-
-st.markdown("""
-Teniendo en cuenta que la variable que se refiere a **duración en la unidad de cuidados intensivos** contiene información que no se tiene cuando un paciente es ingresado al hospital, 
-se decide eliminar con el objetivo de hacer un análisis más realista.
-""")
-
-
-st.markdown("---")
-st.subheader("2.1 Separación en variables categóricas y variables numéricas")
-
-if 'df' in st.session_state:
-    df = st.session_state.df.copy()
-    
-    # Eliminar la variable
-    st.markdown("Se elimina la variable `duration of intensive unit stay`.")
-    if 'duration of intensive unit stay' in df.columns:
-        df = df.drop('duration of intensive unit stay', axis=1)
-
-    # Normalizar los nombres de las columnas
-    df.columns = df.columns.str.strip()
-    
-    st.success("✅ ¡Variables eliminadas y nombres de columnas normalizados!")
-    st.write("Columnas actuales:", list(df.columns))
-
-    # Separar categóricas y numéricas
-    cat_features = [
-        'GENDER', 'RURAL', 'TYPE OF ADMISSION-EMERGENCY/OPD',
-        'OUTCOME_DAMA', 'OUTCOME_DISCHARGE', 'OUTCOME_EXPIRY',
-        'SMOKING', 'ALCOHOL', 'DM', 'HTN', 'CAD', 'PRIOR CMP', 'CKD',
-        'RAISED CARDIAC ENZYMES', 'SEVERE ANAEMIA', 'ANAEMIA', 'STABLE ANGINA',
-        'ACS', 'STEMI', 'ATYPICAL CHEST PAIN', 'HEART FAILURE', 'HFREF', 'HFNEF',
-        'VALVULAR', 'CHB', 'SSS', 'AKI', 'CVA INFRACT', 'CVA BLEED', 'AF', 'VT', 'PSVT',
-        'CONGENITAL', 'UTI', 'NEURO CARDIOGENIC SYNCOPE', 'ORTHOSTATIC',
-        'INFECTIVE ENDOCARDITIS', 'DVT', 'CARDIOGENIC SHOCK', 'SHOCK',
-        'PULMONARY EMBOLISM', 'CHEST INFECTION'
-    ]
-    
-    num_features = [col for col in df.columns if col not in cat_features and col not in ['D.O.A', 'D.O.D', 'DURATION OF STAY']]
-    
-    # Crear y mostrar el DataFrame con solo las variables numéricas
-    df_numericas = df[num_features]
-    
-    st.write("### Vista previa de las variables numéricas:")
-    st.dataframe(df_numericas.head())
-
-    # Guardar los DataFrames y listas en la sesión para los próximos pasos
-    st.session_state.df = df
-    st.session_state.df_numericas = df_numericas
-    st.session_state.cat_features = cat_features
-    st.session_state.num_features = num_features
+    st.subheader("📋 Tipos de variables")
+    st.write(df.dtypes)
 
 else:
-    st.error("Error: El DataFrame 'df' no está disponible en la sesión. Asegúrate de haber ejecutado los pasos anteriores.")
+    st.warning("⚠️ No se pudieron cargar los datos desde GitHub")
 
-# ============================================================
-# Paso 4: Visualización de variables numéricas con Boxplots
-# ============================================================
-import seaborn as sns
-
-st.markdown("---")
-st.header("Análisis de las variables numéricas")
-
-if 'df_numericas' in st.session_state:
-    df_numericas = st.session_state.df_numericas
-    
-    st.subheader("Boxplots de variables numéricas")
-    st.info("Estos gráficos ayudan a visualizar la distribución, la dispersión y la presencia de valores atípicos.")
-
-    # Crear figura con 4 filas y 4 columnas
-    fig, axes = plt.subplots(4, 4, figsize=(20, 15))
-    axes = axes.flatten()
-
-    try:
-        # Iterar sobre las columnas y crear un boxplot para cada una
-        for i, col in enumerate(df_numericas.columns):
-            sns.boxplot(x=df_numericas[col], ax=axes[i])
-            axes[i].set_title(col, fontsize=12)
-            axes[i].tick_params(axis='x', rotation=45)
-            
-        # Eliminar los ejes que no se usan si hay menos de 16 gráficos
-        for j in range(len(df_numericas.columns), len(axes)):
-            fig.delaxes(axes[j])
-
-        plt.tight_layout()
-        st.pyplot(fig)
-        
-    except Exception as e:
-        st.error(f"Ocurrió un error al generar los gráficos: {e}")
-        st.warning("Asegúrate de que el DataFrame 'df_numericas' contiene las columnas correctas y no está vacío.")
-
-else:
-    st.error("Error: El DataFrame 'df_numericas' no está disponible en la sesión. Asegúrate de haber ejecutado los pasos anteriores.")
