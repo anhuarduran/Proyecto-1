@@ -131,3 +131,22 @@ def load_and_clean_data():
     except Exception as e:
         st.error(f"Error al cargar desde la URL: {e}. Asegúrate de tener el archivo `HDHI Admission data.csv` en la misma carpeta.")
         return None
+
+
+st.header("Análisis de la base de datos")
+
+if 'bd' in st.session_state:
+    bd = st.session_state.bd
+    
+    st.markdown("### Información del DataFrame original")
+    
+    # Capturar la salida de bd.info() en un buffer para poder mostrarlo
+    info_buffer = []
+    bd.info(buf=lambda s: info_buffer.append(s))
+    info_output = "\n".join(info_buffer)
+    
+    # Mostrar el resumen de bd.info() en la aplicación
+    st.code(info_output, language='text')
+
+else:
+    st.error("La base de datos 'bd' no ha sido cargada. Asegúrate de ejecutar la función que carga los datos.")
