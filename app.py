@@ -874,98 +874,21 @@ st.write(f"🔎 RMSE: {rmse_test_post:.3f}")
 st.write(f"🔎 R²: {r2_test_post:.3f}")
 st.write(f"🔎 RMSE relativo (test): {rmse_rel_test_post:.3f}")
 
-
-
-
-
-# ============================
-# 6) KNN - Optimización y evaluación
-# ============================
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import GridSearchCV, KFold, learning_curve
-import numpy as np
-import matplotlib.pyplot as plt
-import streamlit as st
-
-# ⚠️ Importante: Escalado para KNN
-pipe_knn = Pipeline(steps=[
-    ("scaler", StandardScaler()),        
-    ("knn", KNeighborsRegressor())
-])
-
-param_grid = {
-    "knn__n_neighbors": list(range(1, 50)),
-    "knn__weights": ["uniform", "distance"],
-    "knn__metric": ["minkowski"],
-    "knn__p": [1, 2],  
-    "knn__algorithm": ['brute', 'kd_tree', 'ball_tree']
-}
-
-cv = KFold(n_splits=5, shuffle=True, random_state=42)
-gs = GridSearchCV(
-    pipe_knn,
-    param_grid,
-    cv=cv,
-    scoring="neg_root_mean_squared_error",
-    n_jobs=-1
-)
-gs.fit(X_train_reduced, y_train)
-
-# Obtener el mejor modelo
-best_knn_model = gs.best_estimator_
-
-# === Resultados de GridSearch ===
-st.subheader("🔍 KNN - Resultados de Optimización")
-st.write("**Mejores hiperparámetros:**", gs.best_params_)
-st.write(f"**Mejor RMSE CV:** {-gs.best_score_:.4f}")
-
-# === Evaluación en TEST ===
-y_pred_test = best_knn_model.predict(X_test_reduced)
-rmse_test_knn = np.sqrt(mean_squared_error(y_test, y_pred_test))
-r2_test_knn = r2_score(y_test, y_pred_test)
-rmse_rel_test_knn = rmse_test_knn / y_test.mean()
-
-st.subheader("📊 Evaluación Final KNN")
-st.write(f"🔎 **RMSE (test):** {rmse_test_knn:.3f}")
-st.write(f"🔎 **R² (test):** {r2_test_knn:.3f}")
-st.write(f"🔎 **RMSE relativo (test):** {rmse_rel_test_knn:.3f}")
-
-# === Curva de Aprendizaje ===
-train_sizes, train_scores, val_scores = learning_curve(
-    best_knn_model,
-    X_train_reduced, y_train,
-    train_sizes=np.linspace(0.1, 1.0, 10),
-    cv=cv,
-    scoring='neg_root_mean_squared_error',
-    n_jobs=-1
-)
-
-train_rmse = -train_scores.mean(axis=1)
-val_rmse   = -val_scores.mean(axis=1)
-
-fig, ax = plt.subplots(figsize=(8, 5))
-ax.plot(train_sizes, train_rmse, 'o-', label='Error de entrenamiento')
-ax.plot(train_sizes, val_rmse, 'o-', label='Error de validación')
-ax.set_xlabel('Tamaño del conjunto de entrenamiento')
-ax.set_ylabel('RMSE')
-ax.set_title('Curva de Aprendizaje - Mejor modelo KNN')
-ax.legend()
-ax.grid(True)
-st.pyplot(fig)
-
-# === Conclusiones ===
-st.subheader("📝 Conclusiones KNN")
+# === Conclusiones Post-pruning ===
+st.subheader("📝 Conclusiones Post-pruning")
 st.write("""
-El mejor modelo KNN, aunque ha sido optimizado con **GridSearchCV**, sigue mostrando un 
-comportamiento de **sobreajuste**. En detalle:
+El modelo logró encontrar el **ccp_alpha óptimo = 0.034431**, lo que resultó en un árbol con 
+**70 hojas y 139 nodos**, un tamaño significativamente menor que un árbol sin podar.  
 
-- **Complejidad excesiva** → incluso con 49 vecinos, el modelo se ajusta demasiado a las particularidades del conjunto de entrenamiento.  
-- **Ruido en los datos** → es probable que la variabilidad de los datos limite la capacidad de generalización del KNN.  
-- **Algoritmos alternativos** (`brute`, `kd_tree`, `ball_tree`) no mostraron mejoras significativas.  
+📉 El **RMSE de validación cruzada** fue de **4.821**, valor comparable al de otros modelos, 
+pero el análisis de la curva de aprendizaje muestra un comportamiento problemático:
 
-👉 En resumen: **KNN no parece ser el modelo más adecuado para estos datos**. Modelos basados en árboles 
-(Random Forest, Gradient Boosting) pueden ofrecer un mejor balance entre sesgo y varianza.
+- El **error de entrenamiento** comienza bajo pero aumenta a medida que se agregan más datos.  
+- El **error de validación** comienza alto y se estabiliza.  
+- Las dos curvas **nunca convergen**, lo que indica un claro **subajuste**.  
+
+👉 En conclusión, a pesar de la poda, el árbol **no logra aprender adecuadamente las relaciones en los datos**, 
+incluso cuando se amplía el conjunto de entrenamiento. Se recomienda explorar modelos más robustos 
+(Random Forest, Gradient Boosting) para mejorar la capacidad de generalización.
 """)
+
