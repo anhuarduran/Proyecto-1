@@ -586,3 +586,125 @@ st.markdown("""
 - Los puntos alejados del origen pueden ser **valores atípicos**.  
 - La dispersión es mayor en la **componente 1**, lo que indica que esta concentra mayor variabilidad de la información.  
 """)
+# ==========================
+# 4.1. PCA: Heatmap de Loadings
+# ==========================
+st.subheader("📌 PCA - Heatmap de Loadings")
+
+# DataFrame con loadings
+loadings = pd.DataFrame(pca.components_, columns=num_features, index=pca_names)
+
+fig3, ax3 = plt.subplots(figsize=(12, 8))
+sns.heatmap(loadings.T, annot=True, fmt=".2f", cmap="coolwarm", cbar=True, ax=ax3)
+ax3.set_title("Mapa de calor de los loadings del PCA")
+ax3.set_xlabel("Componentes principales")
+ax3.set_ylabel("Variables originales")
+st.pyplot(fig3)
+
+st.markdown("""
+**Interpretación de los loadings:**  
+- **PCA1**: fuertemente influenciada por `CREATININE (0.81)` y `UREA (0.54)`.  
+  → Relacionada con la **función renal**.  
+- **PCA2**: dominada por `TLC (0.96)`.  
+  → Relacionada con la **respuesta inmune / estado infeccioso**.  
+- **PCA3**: fuerte correlación con `GLUCOSE (0.92)` y moderada con `AGE (0.23)`.  
+  → Relacionada con **niveles de glucosa**.  
+""")
+
+
+# ==========================
+# 4.2. MCA: Análisis de Correspondencias Múltiples
+# ==========================
+st.subheader("📌 MCA - Variables Categóricas")
+
+# Eigenvalues resumen (inercia por eje)
+ev = mca.eigenvalues_summary.copy()
+
+# Asegurar tipo numérico
+ev["% of variance"] = ev["% of variance"].replace("%", "", regex=True)
+ev["% of variance"] = ev["% of variance"].str.replace(",", ".", regex=False)
+ev["% of variance"] = pd.to_numeric(ev["% of variance"], errors="coerce")
+
+var_exp_mca = ev["% of variance"].values / 100
+cum_var_exp_mca = np.cumsum(var_exp_mca)
+componentes = np.arange(1, len(var_exp_mca) + 1)
+
+# Gráfico Scree Plot
+fig4, ax4 = plt.subplots(figsize=(8, 5))
+ax4.bar(componentes, var_exp_mca, alpha=0.7, label="Varianza explicada")
+ax4.plot(componentes, cum_var_exp_mca, marker="o", color="red", label="Varianza acumulada")
+ax4.set_xticks(componentes)
+ax4.set_xlabel("Componentes MCA")
+ax4.set_ylabel("Proporción de varianza")
+ax4.set_title("Scree plot - MCA")
+ax4.legend()
+ax4.grid(alpha=0.3)
+st.pyplot(fig4)
+
+st.markdown("""
+📊 **Interpretación MCA:**  
+- Las **5 primeras dimensiones** solo explican alrededor del **25% de la varianza**.  
+- Esto indica que las **relaciones entre categorías son difusas** y no se logra una reducción de dimensionalidad tan clara como en PCA.  
+""")
+
+
+# ==========================
+# 4.3. Heatmap MCA - Loadings
+# ==========================
+st.subheader("📌 MCA - Heatmap de Categorías vs Componentes")
+
+coords = mca.column_coordinates(X_train_categoricas)
+coords.index = coords.index.astype(str)
+
+# Filtrado por threshold (opcional)
+threshold = 0.2
+filtered_data = coords.loc[:, coords.abs().max() > threshold]
+
+fig5, ax5 = plt.subplots(figsize=(10, 6))
+sns.heatmap(filtered_data, cmap="coolwarm", center=0, ax=ax5)
+ax5.set_title("Heatmap de loadings - MCA")
+ax5.set_xlabel("Componentes")
+ax5.set_ylabel("Categorías")
+st.pyplot(fig5)
+
+st.markdown("""
+🔎 **Interpretación MCA:**  
+- **Dimensión 1**: relacionada con desenlaces (`OUTCOME_DAMA_1.0`, `SHOCK_0`)  
+- **Dimensión 2**: relacionada con **factores de riesgo** (`ALCOHOL_1.0`, `HTN_1.0`, `CAD_1.0`).  
+- **Dimensión 3**: asociada a condiciones **agudas** (`STEMI_1.0`, `ENDOCARDITIS`).  
+- Dimensiones >3 muestran contribuciones más difusas.  
+""")
+
+
+# ==========================
+# 4.4. Scatterplot MCA
+# ==========================
+st.subheader("📌 MCA - Scatterplot (2 primeras componentes)")
+
+row_coords = mca.row_coordinates(X_train_categoricas)
+
+fig6, ax6 = plt.subplots(figsize=(10, 6))
+sns.scatterplot(x=row_coords[0], y=row_coords[1], alpha=0.6, ax=ax6)
+
+explained_variance_ratio = mca.eigenvalues_
+ax6.set_xlabel(f"Componente 1 ({explained_variance_ratio[0]*100:.2f}%)")
+ax6.set_ylabel(f"Componente 2 ({explained_variance_ratio[1]*100:.2f}%)")
+ax6.set_title("MCA - Scatterplot de las dos primeras componentes")
+ax6.grid(True, linestyle="--", alpha=0.5)
+st.pyplot(fig6)
+
+st.markdown("""
+📌 **Análisis Scatterplot MCA:**  
+- **Componente 1**: explica aprox. **8.06%**.  
+- **Componente 2**: explica aprox. **4.89%**.  
+- La varianza explicada es baja → las 2D no capturan gran parte de la información.  
+- No se aprecian **clusters claros** → las categorías están dispersas.  
+""")
+
+# ==========================
+# 4.5. Dataset reducido
+# ==========================
+X_train_reduced = pd.concat([Xn_train_pca, Xc_train_mca], axis=1)
+X_test_reduced  = pd.concat([Xn_test_pca,  Xc_test_mca],  axis=1)
+
+st.success(f"✅ Shape train reducido: {X_train_reduced.shape}, Shape test reducido: {X_test_reduced.shape}")
