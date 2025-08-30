@@ -769,16 +769,21 @@ El proceso de **pre-pruning** se aplicó con el objetivo de optimizar el modelo 
 """)
 
 # ============================
-# 5) POST-PRUNING
+# 5) POST-PRUNING (árbol grande -> path alphas -> CV en TRAIN)
 # ============================
-st.header("🌳 Post-pruning del Árbol de Decisión")
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.model_selection import KFold, cross_val_score, learning_curve
+from sklearn.metrics import mean_squared_error, r2_score
 
+# === 0) Cast a float32 si aplica (acelera y reduce memoria)
 X_train_np = np.asarray(X_train_reduced, dtype=np.float32)
-y_train_np = np.asarray(y_train)
+y_train_np = np.asarray(y_train)  # target puede quedar en float64
 X_test_np  = np.asarray(X_test_reduced,  dtype=np.float32)
 y_test_np  = np.asarray(y_test)
 
-# Subset para estimar alphas
+# === 1) Ruta de poda en un SUBSET
 rng = np.random.RandomState(42)
 n_sub = min(len(X_train_np), 15000)
 idx = rng.choice(len(X_train_np), n_sub, replace=False)
@@ -789,12 +794,14 @@ tree_full_sub.fit(X_train_np[idx], y_train_np[idx])
 path = tree_full_sub.cost_complexity_pruning_path(X_train_np[idx], y_train_np[idx])
 alphas_full = np.unique(np.round(path.ccp_alphas, 10))
 
+# === 2) Muestrea ~40 alphas representativos (cuantiles)
 if len(alphas_full) > 40:
     quantiles = np.linspace(0, 1, 40)
     ccp_alphas = np.quantile(alphas_full, quantiles)
 else:
     ccp_alphas = alphas_full
 
+# === 3) CV paralela y árbol con límites de complejidad (más rápido)
 kf = KFold(n_splits=3, shuffle=True, random_state=42)
 
 def cv_rmse_for_alpha(a):
@@ -815,9 +822,10 @@ rmse_list = [cv_rmse_for_alpha(a) for a in ccp_alphas]
 best_idx   = int(np.argmin(rmse_list))
 best_alpha = float(ccp_alphas[best_idx])
 
-st.success(f"✅ Mejor ccp_alpha: {best_alpha:.6f} | RMSE CV={rmse_list[best_idx]:.4f}")
+st.subheader("🌳 Post-pruning")
+st.write(f"Mejor `ccp_alpha`: {best_alpha:.6f} | RMSE CV = {rmse_list[best_idx]:.4f}")
 
-# Árbol final
+# === 4) Entrena SOLO el árbol final
 tree_pruned = DecisionTreeRegressor(
     random_state=42,
     ccp_alpha=best_alpha,
@@ -830,7 +838,7 @@ n_leaves = tree_pruned.get_n_leaves()
 n_nodes  = tree_pruned.tree_.node_count
 st.write(f"🌿 Hojas: {n_leaves} | 🔗 Nodos: {n_nodes}")
 
-# Curva de aprendizaje post-pruning
+# --- Curva de Aprendizaje con el árbol podado ---
 train_sizes, train_scores, val_scores = learning_curve(
     tree_pruned,
     X_train_np, y_train_np,
@@ -840,9 +848,11 @@ train_sizes, train_scores, val_scores = learning_curve(
     n_jobs=-1
 )
 
+# Convertir MSE negativo a RMSE
 train_rmse = np.sqrt(-train_scores.mean(axis=1))
 val_rmse   = np.sqrt(-val_scores.mean(axis=1))
 
+# --- Gráfico ---
 fig, ax = plt.subplots(figsize=(8,6))
 ax.plot(train_sizes, train_rmse, 'o-', color='blue', label='Entrenamiento')
 ax.plot(train_sizes, val_rmse, 'o-', color='orange', label='Validación')
@@ -853,7 +863,7 @@ ax.legend(loc='best')
 ax.grid(True)
 st.pyplot(fig)
 
-# Evaluación final
+# --- Evaluación final ---
 y_pred_post = tree_pruned.predict(X_test_np)
 rmse_test_post = np.sqrt(mean_squared_error(y_test_np, y_pred_post))
 r2_test_post = r2_score(y_test_np, y_pred_post)
