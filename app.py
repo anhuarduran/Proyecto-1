@@ -661,3 +661,91 @@ X_train_reduced = pd.concat([Xn_train_pca, Xc_train_mca], axis=1)
 X_test_reduced  = pd.concat([Xn_test_pca,  Xc_test_mca],  axis=1)
 
 st.success(f"✅ Shape train reducido: {X_train_reduced.shape}, Shape test reducido: {X_test_reduced.shape}")
+
+
+# ============================
+# 4) PRE-PRUNING con RandomizedSearchCV (solo TRAIN)
+# ============================
+st.header("🌳 Árbol de Decisión - Pre-Pruning")
+
+import numpy as np
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import learning_curve
+
+pipe_pre = Pipeline(steps=[
+    ('model', DecisionTreeRegressor(random_state=42))
+])
+
+param_dist_pre = {
+    'model__max_depth': np.arange(2, 20),
+    'model__min_samples_split': np.arange(10, 50),
+    'model__min_samples_leaf': np.arange(5, 20),
+    'model__max_features': [None, 'sqrt', 'log2']
+}
+
+search_pre = RandomizedSearchCV(
+    estimator=pipe_pre,
+    param_distributions=param_dist_pre,
+    n_iter=60,
+    cv=5,
+    scoring='neg_root_mean_squared_error',
+    n_jobs=-1,
+    random_state=42,
+    refit=True
+)
+
+with st.spinner("🔎 Entrenando modelo con RandomizedSearchCV..."):
+    search_pre.fit(X_train_reduced, y_train)
+
+# Mostrar mejores hiperparámetros
+st.subheader("📌 Resultados del Pre-Pruning")
+st.write("**Mejores hiperparámetros encontrados:**")
+st.json(search_pre.best_params_)
+
+st.write(f"🏆 Mejor RMSE (CV): {-search_pre.best_score_:.4f}")
+
+# ============================
+# Evaluación en test
+# ============================
+y_pred_pre = search_pre.predict(X_test_reduced)
+rmse_test_pre = np.sqrt(mean_squared_error(y_test, y_pred_pre))
+r2_test_pre = r2_score(y_test, y_pred_pre)
+rmse_rel_test_pre = rmse_test_pre / y_test.mean()
+
+st.success(f"""
+**Evaluación en Test:**
+- 🔎 RMSE: {rmse_test_pre:.3f}  
+- 🔎 R²: {r2_test_pre:.3f}  
+- 🔎 RMSE relativo: {rmse_rel_test_pre:.3f}  
+""")
+
+# ============================
+# 5) Curva de aprendizaje
+# ============================
+st.subheader("📊 Curva de Aprendizaje")
+
+train_sizes, train_scores, val_scores = learning_curve(
+    estimator=search_pre.best_estimator_,
+    X=X_train_reduced,
+    y=y_train,
+    cv=5,
+    scoring="neg_root_mean_squared_error",
+    n_jobs=-1,
+    train_sizes=np.linspace(0.1, 1.0, 10),
+)
+
+train_rmse = -np.mean(train_scores, axis=1)
+val_rmse = -np.mean(val_scores, axis=1)
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(train_sizes, train_rmse, 'o-', color='blue', label='Error de Entrenamiento')
+ax.plot(train_sizes, val_rmse, 'o-', color='orange', label='Error de Validación')
+ax.set_title('Curva de Aprendizaje - Árbol de Decisión con Pre-Pruning')
+ax.set_xlabel('Tamaño del conjunto de entrenamiento')
+ax.set_ylabel('RMSE')
+ax.legend(loc='best')
+ax.grid(True)
+
+st.pyplot(fig)
