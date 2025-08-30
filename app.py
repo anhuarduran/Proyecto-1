@@ -261,3 +261,51 @@ st.markdown("""
 Teniendo en cuenta que la variable que se refiere a **duración en la unidad de cuidados intensivos** contiene información que no se tiene cuando un paciente es ingresado al hospital, 
 se decide eliminar con el objetivo de hacer un análisis más realista.
 """)
+
+
+st.markdown("---")
+st.subheader("2.1 Separación en variables categóricas y variables numéricas")
+
+if 'df' in st.session_state:
+    df = st.session_state.df.copy()
+    
+    # Eliminar la variable
+    st.markdown("Se elimina la variable `duration of intensive unit stay`.")
+    if 'duration of intensive unit stay' in df.columns:
+        df = df.drop('duration of intensive unit stay', axis=1)
+
+    # Normalizar los nombres de las columnas
+    df.columns = df.columns.str.strip()
+    
+    st.success("✅ ¡Variables eliminadas y nombres de columnas normalizados!")
+    st.write("Columnas actuales:", list(df.columns))
+
+    # Separar categóricas y numéricas
+    cat_features = [
+        'GENDER', 'RURAL', 'TYPE OF ADMISSION-EMERGENCY/OPD',
+        'OUTCOME_DAMA', 'OUTCOME_DISCHARGE', 'OUTCOME_EXPIRY',
+        'SMOKING', 'ALCOHOL', 'DM', 'HTN', 'CAD', 'PRIOR CMP', 'CKD',
+        'RAISED CARDIAC ENZYMES', 'SEVERE ANAEMIA', 'ANAEMIA', 'STABLE ANGINA',
+        'ACS', 'STEMI', 'ATYPICAL CHEST PAIN', 'HEART FAILURE', 'HFREF', 'HFNEF',
+        'VALVULAR', 'CHB', 'SSS', 'AKI', 'CVA INFRACT', 'CVA BLEED', 'AF', 'VT', 'PSVT',
+        'CONGENITAL', 'UTI', 'NEURO CARDIOGENIC SYNCOPE', 'ORTHOSTATIC',
+        'INFECTIVE ENDOCARDITIS', 'DVT', 'CARDIOGENIC SHOCK', 'SHOCK',
+        'PULMONARY EMBOLISM', 'CHEST INFECTION'
+    ]
+    
+    num_features = [col for col in df.columns if col not in cat_features and col not in ['D.O.A', 'D.O.D', 'DURATION OF STAY']]
+    
+    # Crear y mostrar el DataFrame con solo las variables numéricas
+    df_numericas = df[num_features]
+    
+    st.write("### Vista previa de las variables numéricas:")
+    st.dataframe(df_numericas.head())
+
+    # Guardar los DataFrames y listas en la sesión para los próximos pasos
+    st.session_state.df = df
+    st.session_state.df_numericas = df_numericas
+    st.session_state.cat_features = cat_features
+    st.session_state.num_features = num_features
+
+else:
+    st.error("Error: El DataFrame 'df' no está disponible en la sesión. Asegúrate de haber ejecutado los pasos anteriores.")
