@@ -422,3 +422,92 @@ st.markdown("""
 
 En general, el **envejecimiento** se relaciona fuertemente con la mayor probabilidad de hospitalización debido a comorbilidades y deterioro natural de la salud.
 """)
+
+# ==========================
+# EDAD vs DÍAS DE HOSPITALIZACIÓN
+# ==========================
+st.header("📌 Relación entre Edad y Días de Hospitalización")
+
+fig, ax = plt.subplots(figsize=(8,6))
+sns.scatterplot(data=df, x="AGE", y="DURATION OF STAY", alpha=0.6, ax=ax)
+sns.regplot(data=df, x="AGE", y="DURATION OF STAY", scatter=False, color="red", ax=ax)
+
+ax.set_title("Relación entre Edad y Días de Hospitalización")
+ax.set_xlabel("Edad del paciente")
+ax.set_ylabel("Días de hospitalización")
+ax.grid(True, linestyle="--", alpha=0.5)
+st.pyplot(fig)
+
+# Correlación numérica
+corr = df["AGE"].corr(df["DURATION OF STAY"])
+st.write(f"**Correlación entre edad y días de hospitalización:** {corr:.4f}")
+
+st.markdown("""
+📊 **Interpretación:**  
+- Existe una correlación **positiva muy débil** (~0.106).  
+- Aunque los pacientes de mayor edad tienden a permanecer un poco más en el hospital, la relación **no es fuerte**.  
+- La gran dispersión de los puntos confirma que **otros factores clínicos y comorbilidades** influyen más en la duración de la hospitalización.  
+""")
+
+
+# ==========================
+# 3. División Train/Test
+# ==========================
+st.header("⚙️ División en Conjuntos de Entrenamiento y Prueba")
+
+# Definimos variables predictoras y objetivo
+X = df[num_features + cat_features]
+y = df["DURATION OF STAY"]
+
+# División
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=42
+)
+
+st.write(f"Tamaño del conjunto de entrenamiento: {X_train.shape[0]} registros")
+st.write(f"Tamaño del conjunto de prueba: {X_test.shape[0]} registros")
+
+st.markdown("""
+La variable objetivo es **DURATION OF STAY** (días de hospitalización).  
+Su predicción es de gran valor para la **planificación clínica y operativa**, permitiendo optimizar:  
+- Disponibilidad de camas 🛏️  
+- Asignación de personal 👩‍⚕️👨‍⚕️  
+- Gestión de recursos hospitalarios ⚕️  
+""")
+
+
+# ==========================
+# 2.2 Preprocesamiento
+# ==========================
+st.header("🔧 Preprocesamiento de Datos")
+
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import RobustScaler
+
+# Pipeline para numéricas
+numeric_transformer = Pipeline(steps=[
+    ("imputer", SimpleImputer(strategy="mean")),
+    ("scaler", RobustScaler())
+])
+
+# Pipeline para categóricas
+categorical_transformer = Pipeline(steps=[
+    ("imputer", SimpleImputer(strategy="most_frequent"))
+])
+
+# ColumnTransformer
+preprocessor = ColumnTransformer(
+    transformers=[
+        ("num", numeric_transformer, num_features),
+        ("cat", categorical_transformer, cat_features)
+    ]
+)
+
+# Aplicar
+X_train_processed = preprocessor.fit_transform(X_train)
+X_test_processed = preprocessor.transform(X_test)
+
+st.success("✅ Preprocesamiento aplicado correctamente: imputación y escalado realizados.")
