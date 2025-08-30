@@ -257,4 +257,7 @@ if 'df' in st.session_state:
 else:
     st.error("Error: El DataFrame 'df' no está disponible en la sesión. Asegúrate de haber ejecutado los pasos anteriores.")
 
-
+st.markdown("""
+Teniendo en cuenta que la variable que se refiere a **duración en la unidad de cuidados intensivos** contiene información que no se tiene cuando un paciente es ingresado al hospital, 
+se decide eliminar con el objetivo de hacer un análisis más realista.
+""")
