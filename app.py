@@ -147,3 +147,13 @@ bd = st.session_state.bd
 if bd is not None:
     st.success("✅ ¡Base de datos cargada correctamente!")
     st.write(bd.head())
+
+if bd is not None:
+    st.header("Información de la base de datos")
+    
+    # Captura y muestra el resultado de bd.info()
+    info_buffer = []
+    bd.info(buf=lambda s: info_buffer.append(s))
+    info_output = "\n".join(info_buffer)
+    
+    st.code(info_output, language='text')
