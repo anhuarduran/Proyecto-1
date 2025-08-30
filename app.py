@@ -300,13 +300,6 @@ st.dataframe(asimetria_pandas, use_container_width=True)
 st.warning("Variables con |asimetría| > 2 (fuertemente sesgadas):")
 st.write(altamente_asimetricas)
 
-# ------------------------
-# 3. Histogramas
-# ------------------------
-st.subheader("📉 Histogramas de variables numéricas")
-fig, ax = plt.subplots(figsize=(12, 8))
-df[num_features].hist(bins=50, figsize=(12, 8))
-st.pyplot(fig)
 
 # ------------------------
 # 4. Interpretación textual
