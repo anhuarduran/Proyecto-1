@@ -169,3 +169,29 @@ if bd is not None:
     st.code(info_output, language='text')
 else:
     st.warning("La base de datos no se pudo cargar. Revisa la URL y tu conexión.")
+
+st.markdown("---")
+st.header("2. Tratamiento de la base de datos")
+
+if 'bd' in st.session_state:
+    st.subheader("Eliminar variables innecesarias")
+    
+    # Crea una copia para no modificar el DataFrame original 'bd'
+    df = st.session_state.bd.copy()
+
+    # Elimina las variables según tu código
+    df = df.drop(['SNO', 'MRD No.', 'month year', 'BNP'], axis=1, errors='ignore')
+    
+    st.success("✅ Variables innecesarias eliminadas.")
+    st.info("Se eliminaron las columnas: 'SNO', 'MRD No.', 'month year' y 'BNP'.")
+    
+    st.write("### Vista previa del nuevo DataFrame (df):")
+    st.dataframe(df.head())
+    
+    # Guarda el nuevo DataFrame limpio en el estado de sesión para el siguiente paso
+    st.session_state.df = df
+else:
+    st.error("Error: La base de datos 'bd' no está disponible en la sesión. Asegúrate de que la sección de carga se ha ejecutado.")
+
+
+
