@@ -122,10 +122,10 @@ st.markdown("""
 | DAMA | Discharged Against Medical Advice | Alta médica solicitada por el paciente en contra de la recomendación |
 """)
 
-
 import streamlit as st
 import pandas as pd
 import numpy as np
+from io import StringIO
 
 # ============================================================
 # Paso 1: Carga y almacenamiento de datos
@@ -138,7 +138,7 @@ def load_data():
     """
     url = "https://raw.githubusercontent.com/Juansebastianrde/Reduccion-de-dimensionalidad/main/HDHI%20Admission%20data.csv"
     try:
-        df = pd.read_csv(url, sep=None, engine="python")
+        df = pd.read_csv(url, sep=",", engine="python")  # 👈 Aseguramos que es coma
         return df
     except Exception as e:
         st.error(f"Error al cargar la base de datos: {e}")
@@ -157,10 +157,14 @@ st.header("Información de la base de datos")
 if bd is not None:
     st.success("✅ ¡Base de datos cargada correctamente!")
     
+    # Mostrar primeras filas
+    st.write("### Vista previa de los datos:")
+    st.dataframe(bd.head())
+    
     # Captura y muestra el resultado de bd.info()
-    info_buffer = []
-    bd.info(buf=lambda s: info_buffer.append(s))
-    info_output = "\n".join(info_buffer)
+    buffer = StringIO()
+    bd.info(buf=buffer)
+    info_output = buffer.getvalue()
     
     st.code(info_output, language='text')
 else:
