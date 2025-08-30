@@ -519,6 +519,7 @@ st.header("🧩 Selección de Características - PCA")
 
 # 1. Extraer numéricas procesadas
 num_indices = [i for i, col in enumerate(X_train.columns) if col in num_features]
+cat_indices = [i for i, col in enumerate(X_train.columns) if col in cat_features]
 
 X_train_numericas = pd.DataFrame(
     X_train_processed[:, num_indices],
@@ -527,6 +528,16 @@ X_train_numericas = pd.DataFrame(
 X_test_numericas = pd.DataFrame(
     X_test_processed[:, num_indices],
     columns=num_features
+)
+
+# También necesitamos las categóricas para MCA
+X_train_categoricas = pd.DataFrame(
+    X_train_processed[:, cat_indices],
+    columns=cat_features
+)
+X_test_categoricas = pd.DataFrame(
+    X_test_processed[:, cat_indices],
+    columns=cat_features
 )
 
 # 2. PCA (90% var. explicada)
@@ -549,7 +560,6 @@ fig, ax = plt.subplots(figsize=(8,5))
 ax.bar(range(1, len(var_exp)+1), var_exp, alpha=0.6, label="Varianza explicada por componente")
 ax.step(range(1, len(cum_var_exp)+1), cum_var_exp, where="mid", color="red", label="Varianza acumulada")
 ax.axhline(y=0.9, color="green", linestyle="--", label="90%")
-
 ax.set_xlabel("Componentes principales")
 ax.set_ylabel("Proporción de varianza explicada")
 ax.set_title("PCA - Varianza explicada y acumulada")
@@ -558,40 +568,11 @@ ax.legend()
 ax.grid(True)
 st.pyplot(fig)
 
-st.markdown("""
-📊 **Interpretación del PCA:**  
-- Para las variables numéricas, se logran construir **3 componentes principales**.  
-- Estas explican cerca del **74% de la varianza total**.  
-- La **primera componente** concentra la mayor parte (~47%), mostrando que algunas variables dominan la variabilidad.  
-""")
-
-
-# 4. Gráfico de dispersión en las 2 primeras componentes
-pc1 = Xn_train_pca.iloc[:, 0]
-pc2 = Xn_train_pca.iloc[:, 1]
-
-fig2, ax2 = plt.subplots(figsize=(10,8))
-ax2.scatter(pc1, pc2, alpha=0.6, s=20)
-ax2.set_xlabel(f"Componente Principal 1 ({pca.explained_variance_ratio_[0]*100:.2f}%)")
-ax2.set_ylabel(f"Componente Principal 2 ({pca.explained_variance_ratio_[1]*100:.2f}%)")
-ax2.set_title("Distribución de los datos en el espacio PCA (2 primeras componentes)")
-ax2.grid(True)
-st.pyplot(fig2)
-
-st.markdown("""
-🔎 **Análisis del gráfico PCA (2D):**  
-- La **primera componente** explica un **43.31%** de la varianza.  
-- La **segunda componente** explica un **16.28%**.  
-- Los puntos cerca del **(0,0)** representan observaciones "típicas".  
-- Los puntos alejados del origen pueden ser **valores atípicos**.  
-- La dispersión es mayor en la **componente 1**, lo que indica que esta concentra mayor variabilidad de la información.  
-""")
 # ==========================
 # 4.1. PCA: Heatmap de Loadings
 # ==========================
 st.subheader("📌 PCA - Heatmap de Loadings")
 
-# DataFrame con loadings
 loadings = pd.DataFrame(pca.components_, columns=num_features, index=pca_names)
 
 fig3, ax3 = plt.subplots(figsize=(12, 8))
@@ -601,29 +582,24 @@ ax3.set_xlabel("Componentes principales")
 ax3.set_ylabel("Variables originales")
 st.pyplot(fig3)
 
-st.markdown("""
-**Interpretación de los loadings:**  
-- **PCA1**: fuertemente influenciada por `CREATININE (0.81)` y `UREA (0.54)`.  
-  → Relacionada con la **función renal**.  
-- **PCA2**: dominada por `TLC (0.96)`.  
-  → Relacionada con la **respuesta inmune / estado infeccioso**.  
-- **PCA3**: fuerte correlación con `GLUCOSE (0.92)` y moderada con `AGE (0.23)`.  
-  → Relacionada con **niveles de glucosa**.  
-""")
-
-
 # ==========================
 # 4.2. MCA: Análisis de Correspondencias Múltiples
 # ==========================
 st.subheader("📌 MCA - Variables Categóricas")
-# Ajustar MCA antes de usar eigenvalues_summary
+
+import prince
 mca = prince.MCA(n_components=10, random_state=42)
 mca = mca.fit(X_train_categoricas)
 
-# Eigenvalues resumen (inercia por eje)
-ev = mca.eigenvalues_summary.copy()
+Xc_train_mca = mca.transform(X_train_categoricas)
+Xc_test_mca  = mca.transform(X_test_categoricas)
 
-# Asegurar tipo numérico
+mca_names = [f"MCA{i+1}" for i in range(Xc_train_mca.shape[1])]
+Xc_train_mca = pd.DataFrame(Xc_train_mca, columns=mca_names, index=X_train.index)
+Xc_test_mca  = pd.DataFrame(Xc_test_mca,  columns=mca_names, index=X_test.index)
+
+# Eigenvalues resumen
+ev = mca.eigenvalues_summary.copy()
 ev["% of variance"] = ev["% of variance"].replace("%", "", regex=True)
 ev["% of variance"] = ev["% of variance"].str.replace(",", ".", regex=False)
 ev["% of variance"] = pd.to_numeric(ev["% of variance"], errors="coerce")
@@ -632,7 +608,6 @@ var_exp_mca = ev["% of variance"].values / 100
 cum_var_exp_mca = np.cumsum(var_exp_mca)
 componentes = np.arange(1, len(var_exp_mca) + 1)
 
-# Gráfico Scree Plot
 fig4, ax4 = plt.subplots(figsize=(8, 5))
 ax4.bar(componentes, var_exp_mca, alpha=0.7, label="Varianza explicada")
 ax4.plot(componentes, cum_var_exp_mca, marker="o", color="red", label="Varianza acumulada")
@@ -644,13 +619,6 @@ ax4.legend()
 ax4.grid(alpha=0.3)
 st.pyplot(fig4)
 
-st.markdown("""
-📊 **Interpretación MCA:**  
-- Las **5 primeras dimensiones** solo explican alrededor del **25% de la varianza**.  
-- Esto indica que las **relaciones entre categorías son difusas** y no se logra una reducción de dimensionalidad tan clara como en PCA.  
-""")
-
-
 # ==========================
 # 4.3. Heatmap MCA - Loadings
 # ==========================
@@ -659,7 +627,6 @@ st.subheader("📌 MCA - Heatmap de Categorías vs Componentes")
 coords = mca.column_coordinates(X_train_categoricas)
 coords.index = coords.index.astype(str)
 
-# Filtrado por threshold (opcional)
 threshold = 0.2
 filtered_data = coords.loc[:, coords.abs().max() > threshold]
 
@@ -669,15 +636,6 @@ ax5.set_title("Heatmap de loadings - MCA")
 ax5.set_xlabel("Componentes")
 ax5.set_ylabel("Categorías")
 st.pyplot(fig5)
-
-st.markdown("""
-🔎 **Interpretación MCA:**  
-- **Dimensión 1**: relacionada con desenlaces (`OUTCOME_DAMA_1.0`, `SHOCK_0`)  
-- **Dimensión 2**: relacionada con **factores de riesgo** (`ALCOHOL_1.0`, `HTN_1.0`, `CAD_1.0`).  
-- **Dimensión 3**: asociada a condiciones **agudas** (`STEMI_1.0`, `ENDOCARDITIS`).  
-- Dimensiones >3 muestran contribuciones más difusas.  
-""")
-
 
 # ==========================
 # 4.4. Scatterplot MCA
@@ -695,14 +653,6 @@ ax6.set_ylabel(f"Componente 2 ({explained_variance_ratio[1]*100:.2f}%)")
 ax6.set_title("MCA - Scatterplot de las dos primeras componentes")
 ax6.grid(True, linestyle="--", alpha=0.5)
 st.pyplot(fig6)
-
-st.markdown("""
-📌 **Análisis Scatterplot MCA:**  
-- **Componente 1**: explica aprox. **8.06%**.  
-- **Componente 2**: explica aprox. **4.89%**.  
-- La varianza explicada es baja → las 2D no capturan gran parte de la información.  
-- No se aprecian **clusters claros** → las categorías están dispersas.  
-""")
 
 # ==========================
 # 4.5. Dataset reducido
