@@ -749,3 +749,117 @@ ax.legend(loc='best')
 ax.grid(True)
 
 st.pyplot(fig)
+
+# ============================
+# 📌 Conclusiones Pre-pruning
+# ============================
+st.header("📌 Conclusiones Pre-pruning")
+
+st.markdown("""
+El proceso de **pre-pruning** se aplicó con el objetivo de optimizar el modelo de árbol de decisión antes de su entrenamiento completo, evitando la creación de un árbol excesivamente complejo.
+
+- La búsqueda de los mejores hiperparámetros identificó una configuración óptima con `max_depth = 3` y `min_samples_leaf = 7`.
+- La curva de aprendizaje mostró **sobreajuste**:  
+  - Error de entrenamiento ≈ 0.  
+  - Error de validación ≈ 4.75 (no mejora con más datos).  
+- En test: RMSE = **4.6892**, consistente con el CV (≈4.7832).  
+- Sin embargo, la diferencia con el error de entrenamiento confirma que el modelo **no generaliza bien**.
+
+👉 Para mejorar: usar más regularización o modelos más robustos como **Random Forest**.
+""")
+
+# ============================
+# 5) POST-PRUNING
+# ============================
+st.header("🌳 Post-pruning del Árbol de Decisión")
+
+X_train_np = np.asarray(X_train_reduced, dtype=np.float32)
+y_train_np = np.asarray(y_train)
+X_test_np  = np.asarray(X_test_reduced,  dtype=np.float32)
+y_test_np  = np.asarray(y_test)
+
+# Subset para estimar alphas
+rng = np.random.RandomState(42)
+n_sub = min(len(X_train_np), 15000)
+idx = rng.choice(len(X_train_np), n_sub, replace=False)
+
+tree_full_sub = DecisionTreeRegressor(random_state=42)
+tree_full_sub.fit(X_train_np[idx], y_train_np[idx])
+
+path = tree_full_sub.cost_complexity_pruning_path(X_train_np[idx], y_train_np[idx])
+alphas_full = np.unique(np.round(path.ccp_alphas, 10))
+
+if len(alphas_full) > 40:
+    quantiles = np.linspace(0, 1, 40)
+    ccp_alphas = np.quantile(alphas_full, quantiles)
+else:
+    ccp_alphas = alphas_full
+
+kf = KFold(n_splits=3, shuffle=True, random_state=42)
+
+def cv_rmse_for_alpha(a):
+    model = DecisionTreeRegressor(
+        random_state=42,
+        ccp_alpha=a,
+        max_depth=6,
+        min_samples_leaf=11
+    )
+    scores = cross_val_score(
+        model, X_train_np, y_train_np,
+        scoring='neg_root_mean_squared_error',
+        cv=kf, n_jobs=-1
+    )
+    return float((-scores).mean())
+
+rmse_list = [cv_rmse_for_alpha(a) for a in ccp_alphas]
+best_idx   = int(np.argmin(rmse_list))
+best_alpha = float(ccp_alphas[best_idx])
+
+st.success(f"✅ Mejor ccp_alpha: {best_alpha:.6f} | RMSE CV={rmse_list[best_idx]:.4f}")
+
+# Árbol final
+tree_pruned = DecisionTreeRegressor(
+    random_state=42,
+    ccp_alpha=best_alpha,
+    max_depth=20,
+    min_samples_leaf=5
+)
+tree_pruned.fit(X_train_np, y_train_np)
+
+n_leaves = tree_pruned.get_n_leaves()
+n_nodes  = tree_pruned.tree_.node_count
+st.write(f"🌿 Hojas: {n_leaves} | 🔗 Nodos: {n_nodes}")
+
+# Curva de aprendizaje post-pruning
+train_sizes, train_scores, val_scores = learning_curve(
+    tree_pruned,
+    X_train_np, y_train_np,
+    train_sizes=np.linspace(0.1, 1.0, 10),
+    cv=5,
+    scoring="neg_mean_squared_error",
+    n_jobs=-1
+)
+
+train_rmse = np.sqrt(-train_scores.mean(axis=1))
+val_rmse   = np.sqrt(-val_scores.mean(axis=1))
+
+fig, ax = plt.subplots(figsize=(8,6))
+ax.plot(train_sizes, train_rmse, 'o-', color='blue', label='Entrenamiento')
+ax.plot(train_sizes, val_rmse, 'o-', color='orange', label='Validación')
+ax.set_title("Curva de Aprendizaje - Árbol Podado")
+ax.set_xlabel("Tamaño del conjunto de entrenamiento")
+ax.set_ylabel("RMSE")
+ax.legend(loc='best')
+ax.grid(True)
+st.pyplot(fig)
+
+# Evaluación final
+y_pred_post = tree_pruned.predict(X_test_np)
+rmse_test_post = np.sqrt(mean_squared_error(y_test_np, y_pred_post))
+r2_test_post = r2_score(y_test_np, y_pred_post)
+rmse_rel_test_post = rmse_test_post / y_test_np.mean()
+
+st.subheader("📊 Evaluación Final Post-pruning")
+st.write(f"🔎 RMSE: {rmse_test_post:.3f}")
+st.write(f"🔎 R²: {r2_test_post:.3f}")
+st.write(f"🔎 RMSE relativo (test): {rmse_rel_test_post:.3f}")
