@@ -134,3 +134,72 @@ def load_and_clean_data():
 
 bd = pd.read_csv('HDHI Admission data.csv')
 st.write(bd.head())
+
+# ============================================================
+# Sección 2: Pre-procesamiento y Limpieza de datos
+# ============================================================
+
+st.header("2. Pre-procesamiento y Limpieza de Datos")
+
+@st.cache_data
+def process_data(bd):
+    """Realiza todas las operaciones de limpieza y pre-procesamiento."""
+    
+    # Se decide eliminar la variable BNP dado que tiene más del 50% de valores faltantes.
+    if 'bnp' in bd.columns:
+        bd.drop('bnp', axis=1, inplace=True)
+        st.info("Variable 'bnp' eliminada por tener más del 50% de valores faltantes.")
+
+    # Convertir nombres de columnas a minúsculas y snake_case para un manejo más fácil
+    bd.columns = bd.columns.str.lower().str.replace(' ', '_').str.replace('.', '', regex=False)
+
+    # Eliminar variables innecesarias
+    df = bd.drop(['sno', 'mrd_no', 'month_year', 'duration_of_intensive_unit_stay'], axis=1, errors='ignore').copy()
+    st.info("Variables 'sno', 'mrd_no', 'month_year' y 'duration_of_intensive_unit_stay' eliminadas.")
+
+    # Transformar las variables de fecha a formato datetime
+    if 'd.o.a' in df.columns:
+        df['d.o.a'] = pd.to_datetime(df['d.o.a'], format='%m/%d/%Y', errors='coerce')
+    if 'd.o.d' in df.columns:
+        df['d.o.d'] = pd.to_datetime(df['d.o.d'], format='%m/%d/%Y', errors='coerce')
+    st.info("Variables de fecha transformadas a formato `datetime`.")
+
+    # Tratamiento de aquellas variables que son numéricas pero están como categóricas
+    cols_to_clean = ['hb', 'tlc', 'platelets', 'glucose', 'urea', 'creatinine', 'ef']
+    for col in cols_to_clean:
+        if col in df.columns:
+            df[col] = (
+                df[col]
+                .astype(str)
+                .str.strip()
+                .replace(['EMPTY', 'nan', 'NaN', 'None', ''], np.nan)
+                .str.replace(r'[<>]', '', regex=True)
+                .str.replace(',', '.', regex=False)
+            )
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    st.info(f"Columnas numéricas {', '.join(cols_to_clean)} limpiadas y convertidas a tipo `float`.")
+
+    # Transforma las variables categóricas a dummies o binarias
+    if 'gender' in df.columns:
+        df['gender'] = df['gender'].map({'M': 1, 'F': 0})
+    if 'rural' in df.columns:
+        df['rural'] = df['rural'].map({'R': 1, 'U': 0})
+    if 'type_of_admission-emergency/opd' in df.columns:
+        df['type_of_admission-emergency/opd'] = df['type_of_admission-emergency/opd'].map({'E': 1, 'O': 0})
+    if 'chest_infection' in df.columns:
+        df['chest_infection'] = df['chest_infection'].astype(str).map({'1.0': 1, '0.0': 0})
+        df['chest_infection'] = pd.to_numeric(df['chest_infection'], errors='coerce')
+    
+    if 'outcome' in df.columns:
+        df = pd.get_dummies(df, columns=['outcome'], drop_first=False)
+    
+    st.info("Variables categóricas mapeadas o convertidas a variables dummy.")
+
+    # Convierte cualquier columna booleana a int (0 y 1)
+    bool_cols = df.select_dtypes(include=bool).columns
+    if len(bool_cols) > 0:
+        df[bool_cols] = df[bool_cols].astype(int)
+    st.info("Variables booleanas convertidas a enteros (0/1).")
+    
+    return df
+# Teniendo en cuenta que la variable que se refiere a duración en la unidad de cuidados intensivos contiene información que no se tiene cuando un paciente es ingresado al hospital, se decide eliminar con el objetivo de hacer un análisis más realista.
