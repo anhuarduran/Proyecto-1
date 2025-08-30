@@ -616,6 +616,9 @@ st.markdown("""
 # 4.2. MCA: Análisis de Correspondencias Múltiples
 # ==========================
 st.subheader("📌 MCA - Variables Categóricas")
+# Ajustar MCA antes de usar eigenvalues_summary
+mca = prince.MCA(n_components=10, random_state=42)
+mca = mca.fit(X_train_categoricas)
 
 # Eigenvalues resumen (inercia por eje)
 ev = mca.eigenvalues_summary.copy()
