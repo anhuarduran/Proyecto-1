@@ -123,30 +123,21 @@ st.markdown("""
 """)
 
 
+# Cargar datos una única vez y guardarlos en la memoria de la aplicación
 @st.cache_data
-def load_and_clean_data():
+def load_data():
     url = "https://raw.githubusercontent.com/Juansebastianrde/Reduccion-de-dimensionalidad/main/HDHI%20Admission%20data.csv"
     try:
-        df_raw = pd.read_csv(url, sep=None, engine="python")
+        df = pd.read_csv(url, sep=None, engine="python")
+        return df
     except Exception as e:
-        st.error(f"Error al cargar desde la URL: {e}. Asegúrate de tener el archivo `HDHI Admission data.csv` en la misma carpeta.")
+        st.error(f"Error al cargar desde la URL: {e}.")
         return None
 
+if 'bd' not in st.session_state:
+    st.session_state.bd = load_data()
 
-st.header("Análisis de la base de datos")
+bd = st.session_state.bd
 
-if 'bd' in st.session_state:
-    bd = st.session_state.bd
-    
-    st.markdown("### Información del DataFrame original")
-    
-    # Capturar la salida de bd.info() en un buffer para poder mostrarlo
-    info_buffer = []
-    bd.info(buf=lambda s: info_buffer.append(s))
-    info_output = "\n".join(info_buffer)
-    
-    # Mostrar el resumen de bd.info() en la aplicación
-    st.code(info_output, language='text')
-
-else:
-    st.error("La base de datos 'bd' no ha sido cargada. Asegúrate de ejecutar la función que carga los datos.")
+if bd is not None:
+    st.dataframe(bd.head())
