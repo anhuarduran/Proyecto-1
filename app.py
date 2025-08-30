@@ -141,3 +141,11 @@ bd = st.session_state.bd
 
 if bd is not None:
     st.dataframe(bd.head())
+
+st.header("Análisis de la base de datos")
+
+# Mostrar info del DataFrame
+info_buffer = []
+bd.info(buf=lambda s: info_buffer.append(s))
+info_output = "\n".join(info_buffer)
+st.code(info_output, language='text')
