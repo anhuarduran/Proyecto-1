@@ -123,33 +123,39 @@ st.markdown("""
 """)
 
 
-# Cargar datos una única vez y guardarlos en la memoria de la aplicación
 import streamlit as st
 import pandas as pd
+import numpy as np
 
-# Cargar datos una única vez
+# ============================================================
+# Paso 1: Carga y almacenamiento de datos
+# ============================================================
 @st.cache_data
 def load_data():
+    """
+    Carga los datos directamente desde la URL de GitHub.
+    Si hay un error en la carga, retorna None.
+    """
     url = "https://raw.githubusercontent.com/Juansebastianrde/Reduccion-de-dimensionalidad/main/HDHI%20Admission%20data.csv"
     try:
         df = pd.read_csv(url, sep=None, engine="python")
         return df
     except Exception as e:
-        st.error(f"Error al cargar desde la URL: {e}.")
+        st.error(f"Error al cargar la base de datos: {e}")
         return None
 
-# Carga la base de datos y la guarda en la memoria de la aplicación
 if 'bd' not in st.session_state:
     st.session_state.bd = load_data()
 
 bd = st.session_state.bd
 
-if bd is not None:
-    st.success("✅ ¡Base de datos cargada correctamente!")
-    st.write(bd.head())
+# ============================================================
+# Paso 2: Mostrar información del DataFrame
+# ============================================================
+st.header("Información de la base de datos")
 
 if bd is not None:
-    st.header("Información de la base de datos")
+    st.success("✅ ¡Base de datos cargada correctamente!")
     
     # Captura y muestra el resultado de bd.info()
     info_buffer = []
@@ -157,3 +163,5 @@ if bd is not None:
     info_output = "\n".join(info_buffer)
     
     st.code(info_output, language='text')
+else:
+    st.warning("La base de datos no se pudo cargar. Revisa la URL y tu conexión.")
