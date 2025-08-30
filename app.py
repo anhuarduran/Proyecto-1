@@ -314,34 +314,37 @@ else:
 # Paso 4: Visualización de variables numéricas con Boxplots
 # ============================================================
 import seaborn as sns
-import matplotlib.pyplot as plt
 
-st.header("3. Distribución de variables numéricas (Boxplots)")
+st.markdown("---")
+st.header("Análisis de las variables numéricas")
 
-if 'df' in locals() or 'df' in st.session_state:
-    # Usar df desde sesión o variable local
-    df_numericas = df.select_dtypes(include=[np.number]).columns.tolist()
+if 'df_numericas' in st.session_state:
+    df_numericas = st.session_state.df_numericas
+    
+    st.subheader("Boxplots de variables numéricas")
+    st.info("Estos gráficos ayudan a visualizar la distribución, la dispersión y la presencia de valores atípicos.")
 
-    if len(df_numericas) > 0:
-        # Crear figura dinámica en función del número de variables
-        n_cols = 4
-        n_rows = math.ceil(len(df_numericas) / n_cols)
+    # Crear figura con 4 filas y 4 columnas
+    fig, axes = plt.subplots(4, 4, figsize=(20, 15))
+    axes = axes.flatten()
 
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(20, 5 * n_rows))
-        axes = axes.flatten()
-
-        for i, col in enumerate(df_numericas):
-            sns.boxplot(x=df[col], ax=axes[i], color="skyblue")
-            axes[i].set_title(col)
+    try:
+        # Iterar sobre las columnas y crear un boxplot para cada una
+        for i, col in enumerate(df_numericas.columns):
+            sns.boxplot(x=df_numericas[col], ax=axes[i])
+            axes[i].set_title(col, fontsize=12)
             axes[i].tick_params(axis='x', rotation=45)
-
-        # Eliminar ejes vacíos
-        for j in range(i + 1, len(axes)):
+            
+        # Eliminar los ejes que no se usan si hay menos de 16 gráficos
+        for j in range(len(df_numericas.columns), len(axes)):
             fig.delaxes(axes[j])
 
         plt.tight_layout()
-        st.pyplot(fig)  # 👈 Mostrar en Streamlit
-    else:
-        st.info("No se encontraron variables numéricas en la base de datos.")
+        st.pyplot(fig)
+        
+    except Exception as e:
+        st.error(f"Ocurrió un error al generar los gráficos: {e}")
+        st.warning("Asegúrate de que el DataFrame 'df_numericas' contiene las columnas correctas y no está vacío.")
+
 else:
-    st.warning("La base de datos no está disponible.")
+    st.error("Error: El DataFrame 'df_numericas' no está disponible en la sesión. Asegúrate de haber ejecutado los pasos anteriores.")
